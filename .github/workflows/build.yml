@@ -1,0 +1,92 @@
+name: Build
+
+on:
+  pull_request:
+  workflow_dispatch:
+  workflow_call:
+
+concurrency:
+  group: build-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # theTerminal.csproj only references MonoGame.Framework.DesktopGL, so the
+  # built Content (including compiled .fx effects) is identical across all
+  # three OSes below - only the native game executable differs per RID. Build
+  # it once here, on Windows, where the shader compiler runs natively (no
+  # Wine/fxccs.dll setup needed), and share it with the other legs instead of
+  # each of them repeating an effect-compile that needs Wine.
+  build-content:
+    name: Build Content
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          lfs: true
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '9.0.x'
+
+      - name: Restore
+        run: dotnet restore theTerminal.sln
+
+      - name: Build game content
+        run: dotnet build theTerminal/theTerminal.csproj -c Release
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: game-content
+          path: theTerminal/Content/bin/DesktopGL
+
+  build:
+    needs: build-content
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            rid: win-x64
+            artifact: windows-x64
+          - os: ubuntu-latest
+            rid: linux-x64
+            artifact: linux-x64
+          - os: macos-latest
+            rid: osx-arm64
+            artifact: macos-arm64
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          lfs: true
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '9.0.x'
+
+      - name: Restore
+        run: dotnet restore theTerminal.sln
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: game-content
+          path: theTerminal/Content/bin/DesktopGL
+
+      - name: Publish
+        run: dotnet publish theTerminal/theTerminal.csproj -c Release -r ${{ matrix.rid }} --self-contained true -o publish/${{ matrix.artifact }} -p:SkipContentBuild=true
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: theTerminal-${{ matrix.artifact }}
+          path: publish/${{ matrix.artifact }}
+
+  # Single aggregate check to require in branch protection instead of tracking
+  # each matrix leg's auto-generated context name individually. Only runs (and
+  # reports success) if every matrix leg above succeeded; otherwise it's
+  # skipped, which counts as "not passing" for a required status check.
+  build-status:
+    name: Build Status
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo "All platform builds succeeded"

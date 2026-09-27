@@ -1,0 +1,44 @@
+name: Release
+
+on:
+  release:
+    types: [published]
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    uses: ./.github/workflows/build.yml
+
+  publish-release:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+          # Excludes the "game-content" artifact (build.yml's shared MGCB
+          # output, not a platform build) - without this, the packaging loop
+          # below treats it as one and fails trying to chmod a theTerminal
+          # binary that doesn't exist in it.
+          pattern: theTerminal-*
+
+      - name: Package each platform build
+        run: |
+          cd artifacts
+          for dir in */; do
+            name="${dir%/}"
+            if [[ "$name" == *windows* ]]; then
+              (cd "$name" && zip -r "../${name}.zip" .)
+            else
+              # tar.gz (not zip) preserves the Unix executable bit on extraction
+              chmod +x "$name/theTerminal"
+              tar -czf "${name}.tar.gz" -C "$name" .
+            fi
+          done
+
+      - name: Attach archives to the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release upload "${{ github.event.release.tag_name }}" artifacts/*.zip artifacts/*.tar.gz --repo ${{ github.repository }} --clobber

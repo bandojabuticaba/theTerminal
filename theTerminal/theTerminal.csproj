@@ -1,0 +1,144 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net9.0</TargetFramework>
+    <RollForward>Major</RollForward>
+    <PublishReadyToRun>false</PublishReadyToRun>
+    <TieredCompilation>false</TieredCompilation>
+  </PropertyGroup>
+  <PropertyGroup>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+    <ApplicationIcon>Icon.ico</ApplicationIcon>
+  </PropertyGroup>
+  <ItemGroup>
+    <None Remove="Icon.ico" />
+    <None Remove="Icon.bmp" />
+  </ItemGroup>
+  <ItemGroup>
+    <EmbeddedResource Include="Icon.ico">
+      <LogicalName>Icon.ico</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="Icon.bmp">
+      <LogicalName>Icon.bmp</LogicalName>
+    </EmbeddedResource>
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="Gum.MonoGame" Version="2026.9.2.1" />
+    <PackageReference Include="MonoGame.Framework.DesktopGL" Version="3.8.*" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="../MonoGameLibrary/MonoGameLibrary.csproj" />
+  </ItemGroup>
+  <Target Name="RunContentBuilder" BeforeTargets="BeforeCompile" AfterTargets="ResolveProjectReferences">
+    <!-- These must be evaluated here (execute-time), not in a top-level PropertyGroup
+         (evaluate-time): $(MonoGamePlatform) is set by MonoGame.Framework.DesktopGL's
+         own build targets, which an SDK-style project only imports at the very end -
+         after any top-level PropertyGroup has already evaluated. Computing these
+         eagerly silently resolved $(MonoGamePlatform) to empty, so content built into
+         Content\bin\ instead of Content\bin\DesktopGL\. -->
+    <PropertyGroup>
+      <_ContentBuilderProject>$(MSBuildThisFileDirectory)..\Content\Content.csproj</_ContentBuilderProject>
+      <_ContentOutputDir>$(MSBuildThisFileDirectory)Content\bin\$(MonoGamePlatform)</_ContentOutputDir>
+      <_ContentIntermediateDir>$(MSBuildThisFileDirectory)Content\obj\$(MonoGamePlatform)</_ContentIntermediateDir>
+    </PropertyGroup>
+    <!-- CI pre-builds content once (on Windows, avoiding Wine) and stages it into
+         _ContentOutputDir, then passes -p:SkipContentBuild=true so these two steps
+         are skipped and the pre-staged files are picked up by the ItemGroup below. -->
+    <!-- macOS-only: CrossOver's own `wine` does its own bottle management and
+         ignores WINEPREFIX, so MGFXC (which expects stock Wine) can't drive it
+         directly. Point mgfxc at $(HOME)/.winemonogame-wrappers/{wine,winepath}
+         instead - thin scripts that call CrossOver's raw wineloader binary
+         directly. Scoped to just this Exec (not the shell profile) so it can't
+         affect `wine` anywhere else on the machine, e.g. CrossOver bottles for
+         other Windows apps. Empty on every other OS, so EnvironmentVariables
+         below is a no-op there - important on Windows, where PATH uses `;` not
+         `:` and an unconditional value here would corrupt PATH for this Exec. -->
+    <PropertyGroup Condition="$([MSBuild]::IsOSPlatform('OSX'))">
+      <_WineEnv>PATH=$(HOME)/.winemonogame-wrappers:$(PATH);MGFXC_WINE_PATH=$(HOME)/.winemonogame</_WineEnv>
+    </PropertyGroup>
+    <MSBuild Condition="'$(SkipContentBuild)' != 'true'" Projects="$(_ContentBuilderProject)" Targets="Build" Properties="Configuration=Release" RemoveProperties="RuntimeIdentifier;RuntimeIdentifiers;SelfContained;PublishReadyToRun;PublishSingleFile;PublishTrimmed" />
+    <!-- WorkingDirectory is required here: Exec otherwise inherits the cwd of
+         whatever process invoked this build (e.g. the repo root when running
+         a "dotnet run" pointed at DungeonSlime via -project), not this
+         project's own directory. The relative workingDir argument passed
+         below resolves against that inherited cwd, so building from outside
+         this folder makes it point at the wrong place, silently building
+         zero content instead of failing loudly. -->
+    <Exec Condition="'$(SkipContentBuild)' != 'true'" EnvironmentVariables="$(_WineEnv)" WorkingDirectory="$(MSBuildThisFileDirectory)" Command="dotnet run --project &quot;$(_ContentBuilderProject)&quot; -c Release --no-build -- build -p $(MonoGamePlatform) --workingDir &quot;$(MSBuildThisFileDirectory)..\Content&quot; -s Assets -o &quot;$(_ContentOutputDir.TrimEnd('\'))&quot; -i &quot;$(_ContentIntermediateDir.TrimEnd('\'))&quot;" />
+    <ItemGroup>
+      <_BuiltContent Include="$(_ContentOutputDir)\**\*.*" />
+      <Content Include="@(_BuiltContent)">
+        <Link>%(RecursiveDir)%(Filename)%(Extension)</Link>
+        <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      </Content>
+    </ItemGroup>
+  </Target>
+
+  <!-- Shader hot reload (see docs.monogame.net "Hot Reloading Shaders" tutorial).
+       That tutorial's own BuildAndCopyContent target depends on IncludeContent /
+       MonoGameContentReference, both supplied by the MonoGame.Content.Builder.Task
+       package - which this project doesn't use. This is the equivalent target
+       built on our own RunContentBuilder instead: it reuses the same content
+       build step, then explicitly copies the result into the run output folder
+       (needed because invoking this target standalone via `dotnet watch build
+       -t:BuildAndCopyContent` bypasses the normal build sequence where the
+       Content item's CopyToOutputDirectory would otherwise handle this). -->
+  <Target Name="BuildAndCopyContent" DependsOnTargets="RunContentBuilder">
+    <!-- RunContentBuilder only builds this game's Content/Assets tree. Assets owned
+         by the library are built by MonoGameLibrary.csproj's BuildSharedContent,
+         which normally runs via AssignTargetPaths when the ProjectReference is
+         built - a sequence that invoking this target standalone bypasses entirely.
+         Without this call, editing a shared .fx triggers dotnet watch, rebuilds
+         nothing, and WatchedAsset never sees a newer .xnb, so hot reload silently
+         does nothing for every shader under MonoGameLibrary/SharedContent. -->
+    <PropertyGroup>
+      <_SharedContentProject>$(MSBuildThisFileDirectory)..\MonoGameLibrary\MonoGameLibrary.csproj</_SharedContentProject>
+      <_SharedContentOutputDir>$(MSBuildThisFileDirectory)..\MonoGameLibrary\Content\bin\$(MonoGamePlatform)</_SharedContentOutputDir>
+    </PropertyGroup>
+    <MSBuild Condition="'$(SkipContentBuild)' != 'true'" Projects="$(_SharedContentProject)" Targets="BuildSharedContent" RemoveProperties="RuntimeIdentifier;RuntimeIdentifiers;SelfContained;PublishReadyToRun;PublishSingleFile;PublishTrimmed" />
+    <ItemGroup>
+      <_WatchedContent Include="$(_ContentOutputDir)\**\*.*" />
+      <_WatchedContent Include="$(_SharedContentOutputDir)\**\*.*" />
+    </ItemGroup>
+    <!-- No extra "Content\" prefix: both output dirs already end in a "Content"
+         folder (see RunContentBuilder above and BuildSharedContent in
+         MonoGameLibrary.csproj), so %(RecursiveDir) already includes it - which is
+         also why one Copy can service both trees. -->
+    <Copy SourceFiles="@(_WatchedContent)"
+          DestinationFolder="$(OutDir)%(RecursiveDir)"
+          SkipUnchangedFiles="false" />
+  </Target>
+
+  <!-- dotnet watch only reacts to files it knows are project items. Our .fx files
+       are discovered by Builder.cs via directory scan, not declared as MSBuild
+       items here, so register them explicitly. -->
+  <ItemGroup>
+    <Watch Include="..\Content\Assets\**\*.fx;..\Content\Assets\**\*.fxh" />
+    <!-- Shaders owned by the library rather than this game (see
+         MonoGameLibrary.csproj's BuildSharedContent target). -->
+    <Watch Include="..\MonoGameLibrary\SharedContent\**\*.fx;..\MonoGameLibrary\SharedContent\**\*.fxh" />
+  </ItemGroup>
+
+  <!-- When only rebuilding content (via BuildAndCopyContent above), stop dotnet
+       watch from also reacting to .cs edits - keeps the content-watch process
+       scoped to shader files only. -->
+  <ItemGroup Condition="'$(OnlyWatchContentFiles)' == 'true'">
+    <Compile Update="**\*.cs" Watch="false" />
+  </ItemGroup>
+
+  <!-- Convenience wrapper: `dotnet build -t:WatchContent` instead of typing the
+       full dotnet watch invocation by hand. Run this in its own terminal, and
+       run the game itself normally (`dotnet run`, or F5) in a separate one -
+       this only rebuilds/copies content on .fx changes, it does not run the game.
+
+       The tutorial this is adapted from also disables AutoRestoreMGCBTool - that
+       property belongs to MonoGame.Content.Builder.Task's IncludeContent target,
+       which this project doesn't use, so it's a no-op here and is omitted.
+       The restore:false switch (passed below) is generic to dotnet build, not
+       MonoGame-specific, so it still applies: skips re-restoring DungeonSlime's
+       own NuGet packages on every .fx save. -->
+  <Target Name="WatchContent">
+    <Exec Command="dotnet watch build -- -t:BuildAndCopyContent -p:OnlyWatchContentFiles=true --restore:false --tl:off"
+          EnvironmentVariables="DOTNET_WATCH_SUPPRESS_EMOJIS=1" />
+  </Target>
+</Project>

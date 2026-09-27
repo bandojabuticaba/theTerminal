@@ -1,0 +1,16 @@
+# .NET build output (present under every project: theTerminal/, MonoGameLibrary/, Content/,
+# and the MonoGame content pipeline's intermediate/output dirs like theTerminal/Content/bin, Content/obj)
+bin/
+obj/
+
+# CI publish output
+publish/
+
+# Visual Studio / Rider / VS Code
+.vs/
+.idea/
+*.user
+*.suo
+
+# macOS
+.DS_Store

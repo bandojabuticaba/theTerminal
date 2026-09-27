@@ -1,0 +1,73 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net9.0</TargetFramework>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="MonoGame.Framework.DesktopGL" Version="3.8.*">
+      <PrivateAssets>All</PrivateAssets>
+    </PackageReference>
+    <PackageReference Include="ImGui.NET" Version="1.91.6.1" />
+  </ItemGroup>
+
+  <!-- Core.cs depends on assets (the scene transition shader and its gradient
+       textures) that must travel with the library, not with whichever game
+       consumes it. Building them here and exposing them as Content items means a
+       new game gets them from the ProjectReference alone, with nothing to
+       remember - this replaces the tutorial's SharedContent.mgcb, which would
+       still require every consuming game to add a MonoGameContentReference.
+
+       BeforeTargets="AssignTargetPaths" is load-bearing: a referencing project
+       collects files from its ProjectReferences via GetCopyToOutputDirectoryItems,
+       which depends on AssignTargetPaths. Items added later (e.g. on BeforeCompile,
+       as DungeonSlime's own RunContentBuilder does) build fine but are invisible
+       to consumers, so the xnbs never reach the game's output folder. -->
+  <Target Name="BuildSharedContent" BeforeTargets="AssignTargetPaths">
+    <PropertyGroup>
+      <!-- Evaluated here rather than in a top-level PropertyGroup: $(MonoGamePlatform)
+           comes from MonoGame.Framework.DesktopGL's targets, imported after any
+           top-level PropertyGroup has evaluated. Same reasoning as the comment in
+           DungeonSlime.csproj's RunContentBuilder. -->
+      <_SharedContentOutputDir>$(MSBuildThisFileDirectory)Content\bin\$(MonoGamePlatform)</_SharedContentOutputDir>
+      <_SharedContentIntermediateDir>$(MSBuildThisFileDirectory)Content\obj\$(MonoGamePlatform)</_SharedContentIntermediateDir>
+      <!-- Overridable so this library can be dropped into another solution whose
+           content builder lives elsewhere. -->
+      <_SharedContentBuilderProject Condition="'$(ContentBuilderProject)' != ''">$(ContentBuilderProject)</_SharedContentBuilderProject>
+      <_SharedContentBuilderProject Condition="'$(ContentBuilderProject)' == ''">$(MSBuildThisFileDirectory)..\Content\Content.csproj</_SharedContentBuilderProject>
+    </PropertyGroup>
+    <!-- macOS-only: CrossOver's own `wine` does its own bottle management and
+         ignores WINEPREFIX, so MGFXC (which expects stock Wine) can't drive it
+         directly. Point mgfxc at $(HOME)/.winemonogame-wrappers/{wine,winepath}
+         instead - thin scripts that call CrossOver's raw wineloader binary
+         directly. Scoped to just this Exec (not the shell profile) so it can't
+         affect `wine` anywhere else on the machine, e.g. CrossOver bottles for
+         other Windows apps. Empty on every other OS, so EnvironmentVariables
+         below is a no-op there - important on Windows, where PATH uses `;` not
+         `:` and an unconditional value here would corrupt PATH for this Exec. -->
+    <PropertyGroup Condition="$([MSBuild]::IsOSPlatform('OSX'))">
+      <_WineEnv>PATH=$(HOME)/.winemonogame-wrappers:$(PATH);MGFXC_WINE_PATH=$(HOME)/.winemonogame</_WineEnv>
+    </PropertyGroup>
+    <MSBuild Condition="'$(SkipContentBuild)' != 'true'" Projects="$(_SharedContentBuilderProject)" Targets="Build" Properties="Configuration=Release" RemoveProperties="RuntimeIdentifier;RuntimeIdentifiers;SelfContained;PublishReadyToRun;PublishSingleFile;PublishTrimmed" />
+    <Exec Condition="'$(SkipContentBuild)' != 'true'" EnvironmentVariables="$(_WineEnv)" Command="dotnet run --project &quot;$(_SharedContentBuilderProject)&quot; -c Release --no-build -- build -p $(MonoGamePlatform) --workingDir &quot;$(MSBuildThisFileDirectory.TrimEnd('\'))&quot; -s SharedContent -o &quot;$(_SharedContentOutputDir.TrimEnd('\'))&quot; -i &quot;$(_SharedContentIntermediateDir.TrimEnd('\'))&quot;" />
+    <!-- Two steps, deliberately. Referencing %(RecursiveDir) in the metadata of the
+         same item being created evaluates to empty, leaving TargetPath blank for
+         AssignTargetPaths to fill in from the project-relative path - which lands
+         these under Content\bin\DesktopGL\Content\ in the consuming game's output.
+         Globbing first and then referencing the *qualified* %(_SharedContentFile.X)
+         captures the real values.
+
+         TargetPath, not Link: MSBuild ignores Link for files inside the project's own
+         directory, which $(_SharedContentOutputDir) is. TargetPath is honored either way.
+
+         No extra "Content\" prefix: the builder appends a Content folder to -o, so
+         RecursiveDir already starts with it. -->
+    <ItemGroup>
+      <_SharedContentFile Include="$(_SharedContentOutputDir)\**\*.*" />
+    </ItemGroup>
+    <ItemGroup>
+      <Content Include="@(_SharedContentFile)"
+               TargetPath="%(_SharedContentFile.RecursiveDir)%(_SharedContentFile.Filename)%(_SharedContentFile.Extension)"
+               CopyToOutputDirectory="PreserveNewest" />
+    </ItemGroup>
+  </Target>
+</Project>
