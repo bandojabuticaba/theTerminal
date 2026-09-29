@@ -10,6 +10,7 @@ using ImGuiNET;
 using ImGuiNET.SampleProgram.XNA;
 using MonoGameLibrary.Graphics;
 using MonoGameLibrary.Content;
+using MonoGameLibrary.Debug;
 using System.Collections.Generic;
 
 
@@ -274,6 +275,8 @@ public class Core : Game
 
     protected override void Draw(GameTime gameTime)
     {
+        GraphicsDevice.Clear(Color.Black);
+
         // If there is an active scene, draw it.
         if (s_activeScene != null)
         {
@@ -285,7 +288,7 @@ public class Core : Game
         SpriteBatch.Draw(SceneTransitionTextures[SceneTransition.TextureIndex % SceneTransitionTextures.Count], GraphicsDevice.Viewport.Bounds, Color.White);  
         SpriteBatch.End();
         
-        Material.DrawVisibleDebugUi(gameTime);
+        DebugOverlay.Draw(gameTime);
 
         base.Draw(gameTime);
     }

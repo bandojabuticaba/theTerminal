@@ -2,6 +2,7 @@
 using Microsoft.Xna.Framework.Graphics;
 using Microsoft.Xna.Framework.Input;
 using MonoGameLibrary;
+using MonoGameLibrary.Debug;
 
 namespace theTerminal;
 
@@ -14,9 +15,12 @@ public class Game1 : Core
 
     protected override void Initialize()
     {
-        // TODO: Add your initialization logic here
-
         base.Initialize();
+
+        new StatsPanel();
+
+        // Flip this to false to hide the debug overlay.
+        DebugOverlay.Visible = true;
     }
 
     protected override void LoadContent()

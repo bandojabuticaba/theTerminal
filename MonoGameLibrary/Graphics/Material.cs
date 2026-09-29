@@ -278,10 +278,15 @@ public class Material
         }
     }
 
+    /// <summary>
+    /// Draws the debug window for every visible material. Assumes the caller (<see
+    /// cref="MonoGameLibrary.Debug.DebugOverlay"/>) owns the surrounding ImGui BeforeLayout/AfterLayout
+    /// frame, since ImGui only tolerates one such frame per game draw call.
+    /// </summary>
     [Conditional("DEBUG")]
-    public static void DrawVisibleDebugUi(GameTime gameTime)
+    public static void DrawAllVisible()
     {
-        // first, cull any materials that are not visible, or disposed. 
+        // first, cull any materials that are not visible, or disposed.
         var toRemove = new List<Material>();
         foreach (var material in s_debugMaterials)
         {
@@ -296,12 +301,10 @@ public class Material
             s_debugMaterials.Remove(material);
         }
 
-        Core.ImGuiRenderer.BeforeLayout(gameTime);
         foreach (var material in s_debugMaterials)
         {
             material.DrawDebug();
         }
-        Core.ImGuiRenderer.AfterLayout();
     }
 
 }
