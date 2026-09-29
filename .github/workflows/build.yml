@@ -34,10 +34,18 @@ jobs:
       - name: Build game content
         run: dotnet build theTerminal/theTerminal.csproj -c Release
 
+      # Also captures MonoGameLibrary's shared shader/image content (a separate
+      # output dir from theTerminal's own, populated by MonoGameLibrary.csproj's
+      # BuildSharedContent target). Core.LoadContent() unconditionally loads that
+      # shared content, and -p:SkipContentBuild=true below disables rebuilding it
+      # on the matrix legs, so without it those legs would publish an executable
+      # that crashes on launch.
       - uses: actions/upload-artifact@v4
         with:
           name: game-content
-          path: theTerminal/Content/bin/DesktopGL
+          path: |
+            theTerminal/Content/bin/DesktopGL
+            MonoGameLibrary/Content/bin/DesktopGL
 
   build:
     needs: build-content
@@ -67,10 +75,12 @@ jobs:
       - name: Restore
         run: dotnet restore theTerminal.sln
 
+      # path: . (repo root) so both subtrees in the game-content artifact land
+      # back at their original relative locations - see the upload step above.
       - uses: actions/download-artifact@v4
         with:
           name: game-content
-          path: theTerminal/Content/bin/DesktopGL
+          path: .
 
       - name: Publish
         run: dotnet publish theTerminal/theTerminal.csproj -c Release -r ${{ matrix.rid }} --self-contained true -o publish/${{ matrix.artifact }} -p:SkipContentBuild=true
