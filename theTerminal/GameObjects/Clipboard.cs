@@ -6,11 +6,11 @@ using Gum.GueDeriving;
 using Microsoft.Xna.Framework;
 using RenderingLibrary.Graphics;
 
-namespace theTerminal.UI;
+namespace theTerminal.GameObjects;
 
 /// <summary>
-/// The word bank: a bordered frame at the bottom of the screen holding the words
-/// the player has collected. The frame is divided into a grid of slots so boxes
+/// The clipboard (the game's word bank): a bordered frame at the bottom of the
+/// screen holding the words the player has copied out of files. The frame is divided into a grid of slots so boxes
 /// stay loosely aligned, but each chip owns its own slot independently - they
 /// don't have to be packed together, and moving one never shifts any other.
 /// Dropping a chip onto another's slot swaps the two; the chip being replaced
@@ -26,7 +26,7 @@ namespace theTerminal.UI;
 /// true the first time. Polling from one place means only one chip can ever be
 /// "the one being dragged" at a time, so that class of bug can't happen here.
 /// </remarks>
-public class WordBankPanel
+public class Clipboard : IDisposable
 {
     private const float Margin = 20f;
     private const int Rows = 5;
@@ -35,7 +35,7 @@ public class WordBankPanel
     private const float ChipWidth = 150f;
     private const float ChipHeight = 40f;
 
-    private static readonly string[] s_words = { "CAT", "FILE.TXT", "./", "SCRIPT.SH" };
+    private static readonly string[] s_words = { "list", "file.txt", "run", "--hiden" };
 
     private sealed class ChipEntry
     {
@@ -54,7 +54,7 @@ public class WordBankPanel
     private float _dragOffsetX;
     private float _dragOffsetY;
 
-    public WordBankPanel()
+    public Clipboard()
     {
         _frame = CreateFrame();
         _columns = (int)((_frame.Width - Padding * 2 + Gap) / (ChipWidth + Gap));
@@ -90,6 +90,22 @@ public class WordBankPanel
         {
             EndDrag();
         }
+    }
+
+    /// <summary>
+    /// Removes the frame and every chip from Gum's root, so they don't stay on
+    /// screen after the scene that owns this clipboard ends.
+    /// </summary>
+    public void Dispose()
+    {
+        var root = GumService.Default.Root.Children;
+        foreach (var entry in _chips)
+        {
+            root.Remove(entry.Chip);
+        }
+        _chips.Clear();
+        root.Remove(_frame);
+        _draggedEntry = null;
     }
 
     private void TryStartDrag(float cursorX, float cursorY)

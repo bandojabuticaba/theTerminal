@@ -1,18 +1,13 @@
 ﻿using Gum;
 using Gum.Forms;
-using Microsoft.Xna.Framework;
-using Microsoft.Xna.Framework.Graphics;
-using Microsoft.Xna.Framework.Input;
 using MonoGameLibrary;
 using MonoGameLibrary.Debug;
-using theTerminal.UI;
+using theTerminal.Scenes;
 
 namespace theTerminal;
 
 public class Game1 : Core
 {
-    private WordBankPanel _wordBankPanel;
-
     public Game1() : base("theTerminal", 1280, 720, false)
     {
     }
@@ -27,27 +22,7 @@ public class Game1 : Core
         DebugOverlay.Visible = true;
 
         GumService.Default.Initialize(this, DefaultVisualsVersion.V3);
-        _wordBankPanel = new WordBankPanel();
+
+        ChangeScene(new GameScene());
     }
-
-    protected override void LoadContent()
-    {
-        base.LoadContent();
-    }
-
-    protected override void Update(GameTime gameTime)
-    {
-        base.Update(gameTime);
-
-        GumService.Default.Update(gameTime);
-        _wordBankPanel.Update(gameTime);
-    }
-
-    protected override void Draw(GameTime gameTime)
-    {
-        base.Draw(gameTime);
-
-        GumService.Default.Draw();
-    }
-
 }
