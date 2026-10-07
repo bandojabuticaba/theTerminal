@@ -6,11 +6,11 @@ using Gum.GueDeriving;
 using Microsoft.Xna.Framework;
 using RenderingLibrary.Graphics;
 
-namespace theTerminal.UI;
+namespace theTerminal.GameObjects;
 
 /// <summary>
-/// The word bank: a bordered frame at the bottom of the screen holding the words
-/// the player has collected. The frame is divided into a grid of slots so boxes
+/// The clipboard (the game's word bank): a bordered frame at the bottom of the
+/// screen holding the words the player has copied out of files. The frame is divided into a grid of slots so boxes
 /// stay loosely aligned, but each chip owns its own slot independently - they
 /// don't have to be packed together, and moving one never shifts any other.
 /// Dropping a chip onto another's slot swaps the two; the chip being replaced
@@ -26,7 +26,7 @@ namespace theTerminal.UI;
 /// true the first time. Polling from one place means only one chip can ever be
 /// "the one being dragged" at a time, so that class of bug can't happen here.
 /// </remarks>
-public class WordBankPanel
+public class Clipboard : IDisposable
 {
     private const float Margin = 20f;
     private const int Rows = 5;
@@ -35,12 +35,18 @@ public class WordBankPanel
     private const float ChipWidth = 150f;
     private const float ChipHeight = 40f;
 
-    private static readonly string[] s_words = { "CAT", "FILE.TXT", "./", "SCRIPT.SH" };
+    private static readonly Word[] s_words =
+    {
+        new Word("list", WordType.Command),
+        new Word("file.txt", WordType.File),
+        new Word("run", WordType.Command),
+        new Word("--hiden", WordType.Parameter),
+    };
 
     private sealed class ChipEntry
     {
         public ContainerRuntime Chip;
-        public string Word;
+        public Word Word;
         public int SlotIndex;
     }
 
@@ -54,7 +60,7 @@ public class WordBankPanel
     private float _dragOffsetX;
     private float _dragOffsetY;
 
-    public WordBankPanel()
+    public Clipboard()
     {
         _frame = CreateFrame();
         _columns = (int)((_frame.Width - Padding * 2 + Gap) / (ChipWidth + Gap));
@@ -90,6 +96,22 @@ public class WordBankPanel
         {
             EndDrag();
         }
+    }
+
+    /// <summary>
+    /// Removes the frame and every chip from Gum's root, so they don't stay on
+    /// screen after the scene that owns this clipboard ends.
+    /// </summary>
+    public void Dispose()
+    {
+        var root = GumService.Default.Root.Children;
+        foreach (var entry in _chips)
+        {
+            root.Remove(entry.Chip);
+        }
+        _chips.Clear();
+        root.Remove(_frame);
+        _draggedEntry = null;
     }
 
     private void TryStartDrag(float cursorX, float cursorY)
@@ -195,7 +217,7 @@ public class WordBankPanel
         entry.Chip.Y = y;
     }
 
-    private void CreateChip(string word, int slotIndex)
+    private void CreateChip(Word word, int slotIndex)
     {
         // A plain runtime container, not a Forms control: no click/press state
         // machinery, no interactivity events - Update() above is solely
@@ -208,7 +230,7 @@ public class WordBankPanel
         var background = new RectangleRuntime(fullInstantiation: true, GumService.Default.SystemManagers)
         {
             IsFilled = true,
-            FillColor = Color.Blue,
+            FillColor = word.Color,
             WidthUnits = DimensionUnitType.RelativeToParent,
             HeightUnits = DimensionUnitType.RelativeToParent,
             Width = 0,
@@ -218,7 +240,7 @@ public class WordBankPanel
 
         var text = new TextRuntime(fullInstantiation: true, GumService.Default.SystemManagers)
         {
-            Text = word,
+            Text = word.Text,
             Color = Color.White,
             WidthUnits = DimensionUnitType.RelativeToParent,
             HeightUnits = DimensionUnitType.RelativeToParent,

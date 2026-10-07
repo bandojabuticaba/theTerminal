@@ -1,0 +1,11 @@
+#
+# Sprite sheet data for MonoGame.
+#
+# To learn how to import these sprites into your MonoGame project visit:
+# https://www.codeandweb.com/texturepacker/monogame
+#
+# Sprite sheet: atlas.png (156 x 160)
+# $TexturePacker:SmartUpdate:88be4cd750b4d244ea0d684de3e76746:8c9b67bdcba538386199d750647356dc:0ad1a65ced8825e99b28219e503f403f$
+#
+
+goldstar;0;1;1;153;158;320;180;0.49673202614379086;0.4810126582278481

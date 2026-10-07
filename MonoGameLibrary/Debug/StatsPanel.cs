@@ -29,8 +29,13 @@ public class StatsPanel : IDebugPanel
             _frameCount = 0;
         }
 
+        var presentationParameters = Core.GraphicsDevice.PresentationParameters;
+        var displayMode = Core.GraphicsDevice.Adapter.CurrentDisplayMode;
+
         ImGui.Begin("Stats");
         ImGui.Text($"FPS: {_fps}");
+        ImGui.Text($"Game resolution: {presentationParameters.BackBufferWidth}x{presentationParameters.BackBufferHeight}");
+        ImGui.Text($"Monitor resolution: {displayMode.Width}x{displayMode.Height}");
         ImGui.End();
     }
 }

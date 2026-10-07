@@ -80,6 +80,24 @@ public class Core : Game
     public static bool ExitOnEscape { get; set; }
 
     /// <summary>
+    /// Gets or Sets a value that indicates if the F key on the keyboard toggles fullscreen.
+    /// </summary>
+    /// <remarks>
+    /// Defaults to false so existing games keep their current behavior unless they opt in.
+    /// </remarks>
+    public static bool ToggleFullScreenOnF { get; set; }
+
+    /// <summary>
+    /// Gets or Sets a value that indicates if the scene transition quad (the fade/wipe effect
+    /// driven by <see cref="SceneTransitionMaterial"/>) should be drawn. The transition's state
+    /// still progresses underneath either way; this only controls whether it's drawn.
+    /// </summary>
+    /// <remarks>
+    /// Defaults to true so existing games keep their current behavior unless they opt out.
+    /// </remarks>
+    public static bool UseSceneTransition { get; set; } = true;
+
+    /// <summary>
     /// Gets a reference to the audio control system.
     /// </summary>
     public static AudioController Audio { get; private set; }
@@ -141,6 +159,7 @@ public class Core : Game
 
         // Create a new graphics device manager.
         Graphics = new GraphicsDeviceManager(this);
+
 
         // Set the graphics defaults
         Graphics.PreferredBackBufferWidth = width;
@@ -245,6 +264,11 @@ public class Core : Game
             Exit();
         }
 
+        if (ToggleFullScreenOnF && Input.Keyboard.WasKeyJustPressed(Keys.F))
+        {
+            Graphics.ToggleFullScreen();
+        }
+
         // if there is a next scene waiting to be switch to, then transition
         // to that scene.
         if (s_nextScene != null && SceneTransition.IsComplete)
@@ -284,10 +308,13 @@ public class Core : Game
         }
         
         // Draw the scene transition quad
-        SpriteBatch.Begin(effect: SceneTransitionMaterial.Effect);  
-        SpriteBatch.Draw(SceneTransitionTextures[SceneTransition.TextureIndex % SceneTransitionTextures.Count], GraphicsDevice.Viewport.Bounds, Color.White);  
-        SpriteBatch.End();
-        
+        if (UseSceneTransition)
+        {
+            SpriteBatch.Begin(effect: SceneTransitionMaterial.Effect);
+            SpriteBatch.Draw(SceneTransitionTextures[SceneTransition.TextureIndex % SceneTransitionTextures.Count], GraphicsDevice.Viewport.Bounds, Color.White);
+            SpriteBatch.End();
+        }
+
         DebugOverlay.Draw(gameTime);
 
         base.Draw(gameTime);
