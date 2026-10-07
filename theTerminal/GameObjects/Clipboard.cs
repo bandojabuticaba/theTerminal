@@ -35,12 +35,18 @@ public class Clipboard : IDisposable
     private const float ChipWidth = 150f;
     private const float ChipHeight = 40f;
 
-    private static readonly string[] s_words = { "list", "file.txt", "run", "--hiden" };
+    private static readonly Word[] s_words =
+    {
+        new Word("list", WordType.Command),
+        new Word("file.txt", WordType.File),
+        new Word("run", WordType.Command),
+        new Word("--hiden", WordType.Parameter),
+    };
 
     private sealed class ChipEntry
     {
         public ContainerRuntime Chip;
-        public string Word;
+        public Word Word;
         public int SlotIndex;
     }
 
@@ -211,7 +217,7 @@ public class Clipboard : IDisposable
         entry.Chip.Y = y;
     }
 
-    private void CreateChip(string word, int slotIndex)
+    private void CreateChip(Word word, int slotIndex)
     {
         // A plain runtime container, not a Forms control: no click/press state
         // machinery, no interactivity events - Update() above is solely
@@ -224,7 +230,7 @@ public class Clipboard : IDisposable
         var background = new RectangleRuntime(fullInstantiation: true, GumService.Default.SystemManagers)
         {
             IsFilled = true,
-            FillColor = Color.Blue,
+            FillColor = word.Color,
             WidthUnits = DimensionUnitType.RelativeToParent,
             HeightUnits = DimensionUnitType.RelativeToParent,
             Width = 0,
@@ -234,7 +240,7 @@ public class Clipboard : IDisposable
 
         var text = new TextRuntime(fullInstantiation: true, GumService.Default.SystemManagers)
         {
-            Text = word,
+            Text = word.Text,
             Color = Color.White,
             WidthUnits = DimensionUnitType.RelativeToParent,
             HeightUnits = DimensionUnitType.RelativeToParent,
