@@ -28,12 +28,12 @@ namespace theTerminal.GameObjects;
 /// </remarks>
 public class Clipboard : IDisposable
 {
-    private const float Margin = 20f;
+    private const float Margin = 0f;
     private const int Rows = 5;
-    private const float Padding = 10f;
-    private const float Gap = 10f;
-    private const float ChipWidth = 150f;
-    private const float ChipHeight = 40f;
+    private const float Padding = 6f;
+    private const float Gap = 4f;
+    private const float ChipWidth = 130f;
+    private const float ChipHeight = 20f;
 
     private static readonly Word[] s_words =
     {
@@ -70,6 +70,16 @@ public class Clipboard : IDisposable
         {
             CreateChip(s_words[i], slotIndex: i);
         }
+    }
+
+    /// <summary>The top edge of the clipboard frame, in screen space.</summary>
+    public float Top => _frame.Y;
+
+    /// <summary>Whether a screen-space point falls inside the clipboard frame.</summary>
+    public bool Contains(float x, float y)
+    {
+        return x >= _frame.X && x <= _frame.X + _frame.Width
+            && y >= _frame.Y && y <= _frame.Y + _frame.Height;
     }
 
     public void Update(GameTime gameTime)

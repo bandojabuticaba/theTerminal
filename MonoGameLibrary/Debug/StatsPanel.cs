@@ -35,6 +35,12 @@ public class StatsPanel : IDebugPanel
         ImGui.Begin("Stats");
         ImGui.Text($"FPS: {_fps}");
         ImGui.Text($"Game resolution: {presentationParameters.BackBufferWidth}x{presentationParameters.BackBufferHeight}");
+        if (Core.UseVirtualResolution)
+        {
+            var destination = Core.VirtualDestination;
+            float scale = (float)destination.Width / Core.VirtualWidth;
+            ImGui.Text($"Virtual resolution: {Core.VirtualWidth}x{Core.VirtualHeight} (x{scale:0.00})");
+        }
         ImGui.Text($"Monitor resolution: {displayMode.Width}x{displayMode.Height}");
         ImGui.End();
     }
