@@ -98,6 +98,78 @@ public class Core : Game
     public static bool UseSceneTransition { get; set; } = true;
 
     /// <summary>
+    /// Gets or Sets a value that indicates if the game draws at a fixed virtual resolution
+    /// (the width and height given to the constructor) and scales it to fit the back buffer,
+    /// with black bars where the aspect ratios differ.
+    /// </summary>
+    /// <remarks>
+    /// Defaults to false so existing games keep their current behavior unless they opt in.
+    /// Scenes and materials that set their own render targets will need to restore
+    /// <see cref="VirtualTarget"/> instead of null when this is on. The debug overlay is
+    /// always drawn at the real back buffer size, unscaled.
+    /// </remarks>
+    public static bool UseVirtualResolution { get; set; }
+
+    /// <summary>
+    /// Gets the width, in pixels, of the virtual resolution: the width given to the constructor.
+    /// </summary>
+    public static int VirtualWidth { get; private set; }
+
+    /// <summary>
+    /// Gets the height, in pixels, of the virtual resolution: the height given to the constructor.
+    /// </summary>
+    public static int VirtualHeight { get; private set; }
+
+    /// <summary>
+    /// Gets the render target the game draws into when <see cref="UseVirtualResolution"/> is on.
+    /// </summary>
+    public static RenderTarget2D VirtualTarget { get; private set; }
+
+    /// <summary>
+    /// Gets where the virtual resolution lands on the back buffer: as large as fits while
+    /// keeping its aspect ratio, centered. The full back buffer when the feature is off.
+    /// </summary>
+    public static Rectangle VirtualDestination
+    {
+        get
+        {
+            var parameters = GraphicsDevice.PresentationParameters;
+            int backBufferWidth = parameters.BackBufferWidth;
+            int backBufferHeight = parameters.BackBufferHeight;
+
+            if (!UseVirtualResolution)
+            {
+                return new Rectangle(0, 0, backBufferWidth, backBufferHeight);
+            }
+
+            float scale = Math.Min((float)backBufferWidth / VirtualWidth, (float)backBufferHeight / VirtualHeight);
+            int width = (int)(VirtualWidth * scale);
+            int height = (int)(VirtualHeight * scale);
+
+            return new Rectangle((backBufferWidth - width) / 2, (backBufferHeight - height) / 2, width, height);
+        }
+    }
+
+    /// <summary>
+    /// Gets the matrix that maps a back buffer position (such as the raw mouse position)
+    /// into virtual resolution coordinates. Identity when the feature is off.
+    /// </summary>
+    public static Matrix ScreenToVirtual
+    {
+        get
+        {
+            if (!UseVirtualResolution)
+            {
+                return Matrix.Identity;
+            }
+
+            Rectangle destination = VirtualDestination;
+            return Matrix.CreateTranslation(-destination.X, -destination.Y, 0f)
+                 * Matrix.CreateScale((float)VirtualWidth / destination.Width, (float)VirtualHeight / destination.Height, 1f);
+        }
+    }
+
+    /// <summary>
     /// Gets a reference to the audio control system.
     /// </summary>
     public static AudioController Audio { get; private set; }
@@ -164,6 +236,8 @@ public class Core : Game
         // Set the graphics defaults
         Graphics.PreferredBackBufferWidth = width;
         Graphics.PreferredBackBufferHeight = height;
+        VirtualWidth = width;
+        VirtualHeight = height;
         Graphics.IsFullScreen = fullScreen;
 
         // Apply the graphic presentation changes.
@@ -299,6 +373,12 @@ public class Core : Game
 
     protected override void Draw(GameTime gameTime)
     {
+        if (UseVirtualResolution)
+        {
+            VirtualTarget ??= new RenderTarget2D(GraphicsDevice, VirtualWidth, VirtualHeight);
+            GraphicsDevice.SetRenderTarget(VirtualTarget);
+        }
+
         GraphicsDevice.Clear(Color.Black);
 
         // If there is an active scene, draw it.
@@ -306,12 +386,24 @@ public class Core : Game
         {
             s_activeScene.Draw(gameTime);
         }
-        
+
         // Draw the scene transition quad
         if (UseSceneTransition)
         {
             SpriteBatch.Begin(effect: SceneTransitionMaterial.Effect);
             SpriteBatch.Draw(SceneTransitionTextures[SceneTransition.TextureIndex % SceneTransitionTextures.Count], GraphicsDevice.Viewport.Bounds, Color.White);
+            SpriteBatch.End();
+        }
+
+        if (UseVirtualResolution)
+        {
+            // Scale the finished frame onto the real back buffer. Linear filtering,
+            // because the scale is rarely a whole number and point sampling would
+            // make some pixel rows and columns visibly thicker than others.
+            GraphicsDevice.SetRenderTarget(null);
+            GraphicsDevice.Clear(Color.Black);
+            SpriteBatch.Begin(samplerState: SamplerState.LinearClamp);
+            SpriteBatch.Draw(VirtualTarget, VirtualDestination, Color.White);
             SpriteBatch.End();
         }
 
