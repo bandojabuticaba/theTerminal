@@ -19,4 +19,16 @@
     <PackageReference Include="MonoGame.Tool.FFmpeg" Version="7.0.0.*" />
     <PackageReference Include="MonoGame.Tool.FFprobe" Version="7.0.0.*" />
   </ItemGroup>
+  <!-- SharpDX 4.0.1 (pinned by MonoGame's content pipeline) depends on ancient
+       .NET Core 1.0 runtime packages (Microsoft.NETCore.App 1.0.5, Jit 1.0.7)
+       that NuGet's audit flags. They can't be upgraded (SharpDX never released
+       a patched version), they never execute on the .NET 10 runtime, and this
+       project is a build-time content builder - nothing here ships with the
+       game. Suppress these specific advisories so the audit still catches
+       anything new. -->
+  <ItemGroup>
+    <NuGetAuditSuppress Include="https://github.com/advisories/GHSA-7mfr-774f-w5r9" />
+    <NuGetAuditSuppress Include="https://github.com/advisories/GHSA-8884-xcr4-r68p" />
+    <NuGetAuditSuppress Include="https://github.com/advisories/GHSA-xcvr-qv8h-m7xw" />
+  </ItemGroup>
 </Project>
