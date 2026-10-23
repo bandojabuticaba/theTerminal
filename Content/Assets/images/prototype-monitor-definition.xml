@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    The close-up monitor shown once the cubicle has turned to face it. The
+    region is the opaque part of prototype_atlas-1.png (the rest is transparent
+    padding).
+-->
+<TextureAtlas>
+    <Texture>images/prototype_atlas-1</Texture>
+    <Regions>
+        <Region name="monitor" x="190" y="185" width="748" height="804" />
+    </Regions>
+</TextureAtlas>

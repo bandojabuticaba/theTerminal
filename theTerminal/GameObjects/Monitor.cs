@@ -6,47 +6,61 @@ using MonoGameLibrary.Graphics;
 namespace theTerminal.GameObjects;
 
 /// <summary>
-/// The pixel-art monitor prop, drawn above the clipboard. Loaded through the
-/// same TextureAtlas pipeline DungeonSlime uses (atlas-definition.xml +
-/// atlas.png) - the difference is atlas.png here comes from TexturePacker
-/// (trimmed/packed) rather than hand-measured region coordinates.
+/// The close-up monitor (prototype art), laid over the cubicle once it has
+/// turned to face the monitor, and the thing the terminal zoom pushes into.
+/// The art is high resolution (748x804) so it still looks sharp after the
+/// zoom; it starts scaled down to cover the monitor in the scene.
 /// </summary>
 public class Monitor
 {
-    // Prototype scale: the monitor's native art is 153x158 (TexturePacker's
-    // trimmed size). At 2x it's 306x316 on screen, comfortably fitting the
-    // ~440px tall area above the clipboard frame. Adjust once the real art
-    // and final layout are in.
-    private static readonly Vector2 SpriteScale = new(2f, 2f);
-
     // The dark glass area inside the bezel, in the sprite's native pixels
-    // (measured from atlas.png, just inside the black outline). Redo this if
-    // the monitor art changes.
-    private static readonly Rectangle ScreenRegion = new(14, 15, 124, 96);
+    // (measured from prototype_atlas-1.png). Redo this if the monitor art changes.
+    private static readonly Rectangle ScreenRegion = new(95, 124, 556, 451);
+
+    // Height of the bezel alone, without the stand below it, in native pixels.
+    private const float BezelHeight = 679f;
 
     private readonly Sprite _sprite;
 
     public Vector2 Position;
+
+    /// <summary>How opaque the monitor is drawn, from 0 (invisible) to 1.</summary>
+    public float Opacity = 1f;
 
     public float Width => _sprite.Width;
     public float Height => _sprite.Height;
 
     /// <summary>The screen (glass) area in world space, at the current position and scale.</summary>
     public Rectangle ScreenBounds => new(
-        (int)(Position.X + ScreenRegion.X * SpriteScale.X),
-        (int)(Position.Y + ScreenRegion.Y * SpriteScale.Y),
-        (int)(ScreenRegion.Width * SpriteScale.X),
-        (int)(ScreenRegion.Height * SpriteScale.Y));
+        (int)(Position.X + ScreenRegion.X * _sprite.Scale.X),
+        (int)(Position.Y + ScreenRegion.Y * _sprite.Scale.Y),
+        (int)(ScreenRegion.Width * _sprite.Scale.X),
+        (int)(ScreenRegion.Height * _sprite.Scale.Y));
 
     public Monitor(ContentManager content)
     {
-        TextureAtlas atlas = TextureAtlas.FromFile(content, "images/atlas-definition.xml");
+        TextureAtlas atlas = TextureAtlas.FromFile(content, "images/prototype-monitor-definition.xml");
         _sprite = atlas.CreateSprite("monitor");
-        _sprite.Scale = SpriteScale;
+    }
+
+    /// <summary>
+    /// Scales the monitor uniformly so its bezel is as tall as
+    /// <paramref name="bounds"/>, top-aligned and centered horizontally on them.
+    /// Uniform even when the scene is stretched, so the screen keeps its real
+    /// shape when the terminal zoom fills the view with it. The stand hangs
+    /// below, over the scene's own stand.
+    /// </summary>
+    public void FitTo(Rectangle bounds)
+    {
+        float scale = bounds.Height / BezelHeight;
+        _sprite.Scale = new Vector2(scale, scale);
+        Position = new Vector2(bounds.Center.X - Width / 2f, bounds.Top);
     }
 
     public void Draw(SpriteBatch spriteBatch)
     {
+        // Content textures are premultiplied, so fading scales every channel.
+        _sprite.Color = Color.White * Opacity;
         _sprite.Draw(spriteBatch, Position);
     }
 }
