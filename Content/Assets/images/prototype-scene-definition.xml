@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    The cubicle turning from its angled view to facing the monitor head-on.
+    prototype_atlas-0.png is a 4x2 grid separated by thin black lines that
+    aren't evenly spaced, so each frame is a 358x541 cut placed just inside
+    the lines (measured from the image). Redo these if the art changes.
+-->
+<TextureAtlas>
+    <Texture>images/prototype_atlas-0</Texture>
+    <Regions>
+        <Region name="cubicle-0" x="2" y="1" width="358" height="541" />
+        <Region name="cubicle-1" x="365" y="1" width="358" height="541" />
+        <Region name="cubicle-2" x="726" y="1" width="358" height="541" />
+        <Region name="cubicle-3" x="1090" y="1" width="358" height="541" />
+        <Region name="cubicle-4" x="2" y="546" width="358" height="541" />
+        <Region name="cubicle-5" x="365" y="546" width="358" height="541" />
+        <Region name="cubicle-6" x="726" y="546" width="358" height="541" />
+        <Region name="cubicle-7" x="1090" y="546" width="358" height="541" />
+
+        <!-- Placeholder inspectable objects, cut straight out of cubicle-0. -->
+        <Region name="mug" x="305" y="239" width="26" height="34" />
+    </Regions>
+    <Animations>
+        <Animation name="turn-to-monitor" delay="80">
+            <Frame region="cubicle-0" />
+            <Frame region="cubicle-1" />
+            <Frame region="cubicle-2" />
+            <Frame region="cubicle-3" />
+            <Frame region="cubicle-4" />
+            <Frame region="cubicle-5" />
+            <Frame region="cubicle-6" />
+            <Frame region="cubicle-7" />
+        </Animation>
+    </Animations>
+</TextureAtlas>
