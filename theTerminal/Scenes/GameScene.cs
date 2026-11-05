@@ -19,12 +19,13 @@ namespace theTerminal.Scenes;
 /// </summary>
 /// <remarks>
 /// In <see cref="Mode.Explore"/> the player sees the cubicle at an angle.
-/// Clicking its monitor plays the turn animation (<see cref="Mode.TurningIn"/>);
-/// once the cubicle faces the monitor, the close-up monitor art is laid over
-/// the scene's monitor and the camera zooms in until its screen fills the area
-/// above the clipboard (<see cref="Mode.Terminal"/>). Esc, or clicking outside
-/// both the screen and the clipboard, zooms back out (<see cref="Mode.Leaving"/>)
-/// and then plays the turn backwards (<see cref="Mode.TurningOut"/>). Also in
+/// Clicking its monitor plays the turn animation (<see cref="Mode.TurningIn"/>),
+/// and partway through the camera starts zooming in until the monitor's screen
+/// fills the area above the clipboard. Once the cubicle faces the monitor
+/// (<see cref="Mode.Terminal"/>) the zoom finishes, and with the prototype art
+/// the close-up monitor is laid over the scene's monitor meanwhile. Esc, or clicking outside both the screen and the
+/// clipboard, zooms back out (<see cref="Mode.Leaving"/>), and partway out the
+/// turn plays backwards (<see cref="Mode.TurningOut"/>). Also in
 /// explore, hovering an <see cref="Inspectable"/> object turns it toward the
 /// cursor, and clicking it opens a details panel (<see cref="Mode.Inspecting"/>)
 /// until Esc or a click outside the panel. The
@@ -50,16 +51,24 @@ public class GameScene : Scene
     // centered, black bars on the sides) instead of stretched over the canvas.
     private static readonly bool StretchScene = false;
 
-    // How far into the zoom (0 to 1, see _zoomT) the close-up monitor finishes
-    // fading in over the scene's own monitor. The two are different art, so a
-    // fade hides the swap better than a hard cut. Lower is a quicker fade.
-    private const float MonitorFadeEnd = 0.6f;
+    // How long, in seconds, the prototype close-up monitor takes to fade in over
+    // the scene's own monitor once the turn ends. It's different art, so a fade
+    // hides the swap better than a hard cut.
+    private const float MonitorFadeDuration = 0.3f;
+
+    // How far into the turn (0 to 1, see Cubicle.TurnProgress) the zoom starts,
+    // so the two blend into one movement instead of turn-then-zoom. 1 waits for
+    // the turn to end. Zooming out mirrors it: the turn away starts at the zoom
+    // level the turn in ended on.
+    private const float TurnZoomStart = 0.5f;
 
     // How big the scene's pixelation blocks get, in texture pixels, once fully
     // zoomed in. The scene behind the monitor is blown up several times by the
     // zoom; pixelating it makes that read as deliberate, chunky background
-    // instead of blurry, over-scaled art. 1 turns the effect off.
-    private const int MaxScenePixelSize = 4;
+    // instead of blurry, over-scaled art. 1 turns the effect off. Off for Neo's
+    // room: it's already pixel art, and with no close-up its own monitor is what
+    // fills the view, so pixelating the scene would pixelate the monitor too.
+    private static readonly int MaxScenePixelSize = Cubicle.UseNeoRoom ? 1 : 4;
 
     // Starting strength of the inspectables' hover effect (see 3dEffect.fxh):
     // how far they turn toward the cursor, in turns, and how much they grow.
@@ -70,24 +79,35 @@ public class GameScene : Scene
     // Flip this to false to hide the 3dEffect debug window (sliders for the
     // hover effect). Leave its "Override Values" box unticked: it would also
     // freeze the per-object values the scene sets every frame.
-    private static readonly bool ShowInspectEffectDebug = true;
+    private static readonly bool ShowInspectEffectDebug = false;
 
     // How long a full zoom between explore and terminal takes, in seconds.
-    private const float ZoomDuration = 0.5f;
+    private const float ZoomDuration = 0.8f;
 
-    // The timing curve for the zoom (see MonoGameLibrary.Easing). An Out curve
-    // because the player triggers the zoom: it reacts instantly to the click and
-    // settles softly. Swap for Easing.OutCubic (gentler) or Easing.OutBack
-    // (slight overshoot, a physical "lean in") to compare.
-    private static readonly Func<float, float> ZoomEasing = Easing.OutQuart;
+    // The timing curve for the zoom in (see MonoGameLibrary.Easing). In-out
+    // because the zoom joins a turn that's already moving (see TurnZoomStart):
+    // it eases in alongside it and settles softly. With TurnZoomStart = 1 the
+    // zoom starts from rest after the click, where Easing.OutQuart reacts quicker.
+    private static readonly Func<float, float> ZoomInEasing = Easing.InOutCubic;
+
+    // The timing curve for the zoom out. Not the zoom in mirrored: there the
+    // zoom moves first, from rest, so an in-out start reads as lag after Esc.
+    // An Out curve reacts at once, and reaches the turn away sooner.
+    private static readonly Func<float, float> ZoomOutEasing = Easing.OutCubic;
 
     // Linear rather than point sampling: the prototype art is drawn at
     // non-integer scales (the scene stretched ~4x by ~1.5x, the monitor at ~0.2x and growing
     // with the zoom), where point sampling gives uneven, shimmering pixels.
     private static readonly SamplerState ArtSampler = SamplerState.LinearClamp;
 
+    // Neo's room fills the canvas at an even 3x, so point sampling keeps every
+    // rendered pixel a crisp block. The prototype art needs linear (above).
+    private static readonly SamplerState SceneSampler = Cubicle.UseNeoRoom ? SamplerState.PointClamp : ArtSampler;
+
     private Clipboard _clipboard;
     private Cubicle _cubicle;
+
+    // The prototype close-up; null with Neo's room, which has none.
     private Monitor _monitor;
     private Material _pixelate;
     private Material _turn3d;
@@ -106,6 +126,13 @@ public class GameScene : Scene
     private float _zoomTo;
     private float _zoomElapsed;
     private float _zoomDuration;
+
+    // The zoom level (see _zoomT) when the turn in ended and the close-up took
+    // over. Below it the scene's own monitor is on screen, so the scene is only
+    // pixelated above it; zooming out hands back to the turn there too.
+    private float _handoffZoom;
+
+    private float _monitorOpacity;
 
     // The terminal view as a zoom about a fixed point: the one world point that
     // stays in the same place on screen in both views. Every other point moves
@@ -138,8 +165,11 @@ public class GameScene : Scene
             _cubicle.Position = new Vector2((Core.VirtualWidth - _cubicle.Width) / 2f, 0f);
         }
 
-        _monitor = new Monitor(Content);
-        _monitor.FitTo(_cubicle.FrontMonitorBounds);
+        if (!Cubicle.UseNeoRoom)
+        {
+            _monitor = new Monitor(Content);
+            _monitor.FitTo(_cubicle.FrontMonitorBounds);
+        }
 
         _pixelate = Core.SharedContent.WatchMaterial("effects/pixelateEffect");
         _pixelate.SetParameter("TextureSize", new Vector2(_cubicle.Texture.Width, _cubicle.Texture.Height));
@@ -149,9 +179,12 @@ public class GameScene : Scene
         _turn3d.SetParameter("LiftIntensity", InspectLiftIntensity);
         _turn3d.IsDebugVisible = ShowInspectEffectDebug;
 
-        // The objects the player can click for details (see Inspectable).
-        TextureAtlas sceneAtlas = TextureAtlas.FromFile(Content, "images/prototype-scene-definition.xml");
-        _inspectables.Add(new CoffeeMug(sceneAtlas, _cubicle));
+        // The objects the player can click for details (see Inspectable). They
+        // are layers of Neo's room; the prototype art has none.
+        if (Cubicle.UseNeoRoom)
+        {
+            _inspectables.Add(new ComputerMouse(_cubicle));
+        }
     }
 
     public override void Update(GameTime gameTime)
@@ -181,10 +214,7 @@ public class GameScene : Scene
                 UpdateInspecting();
                 break;
             case Mode.TurningIn:
-                if (!_cubicle.IsTurning)
-                {
-                    SetMode(Mode.Terminal);
-                }
+                UpdateTurningIn();
                 break;
             case Mode.Terminal:
                 UpdateTerminal();
@@ -199,43 +229,58 @@ public class GameScene : Scene
                 }
                 break;
         }
+
+        // The close-up fades in once the cubicle faces the monitor, and goes as
+        // soon as it turns away (the frames no longer match it).
+        if (_mode == Mode.Terminal || _mode == Mode.Leaving)
+        {
+            float step = (float)gameTime.ElapsedGameTime.TotalSeconds / MonitorFadeDuration;
+            _monitorOpacity = Math.Min(_monitorOpacity + step, 1f);
+        }
+        else
+        {
+            _monitorOpacity = 0f;
+        }
     }
 
     public override void Draw(GameTime gameTime)
     {
         // Drawn inside the scene so Core's transition overlay covers it.
         // The scene gets blockier as the camera zooms in, in whole-texel steps so
-        // the blocks snap rather than swim. Outside the zoom it's drawn plain.
-        int pixelSize = 1 + (int)MathF.Round((MaxScenePixelSize - 1) * MathHelper.Clamp(_zoomT, 0f, 1f));
+        // the blocks snap rather than swim. Only once the close-up has taken over
+        // (above _handoffZoom), so the monitor itself is never pixelated.
+        float pixelation = MathHelper.Clamp((_zoomT - _handoffZoom) / (1f - _handoffZoom), 0f, 1f);
+        int pixelSize = 1 + (int)MathF.Round((MaxScenePixelSize - 1) * pixelation);
         _pixelate.SetParameter("PixelSize", pixelSize);
 
         Core.SpriteBatch.Begin(
-            samplerState: ArtSampler,
+            samplerState: SceneSampler,
             transformMatrix: _camera,
             effect: pixelSize > 1 ? _pixelate.Effect : null);
         _cubicle.Draw(Core.SpriteBatch);
         Core.SpriteBatch.End();
 
-        // Inspectables only line up with the angled frame, which is on screen
-        // (unzoomed) only in these two modes. The 3D camera is rebuilt here
+        // Inspectables are part of the angled frame (Neo's room hands them its
+        // own sprites for it), so they're drawn whenever it's on screen - also
+        // the moment a turn starts or ends - and through the zoom camera, in
+        // case it isn't quite back to rest. The 3D camera is rebuilt here
         // rather than at load: it reads the viewport, which is only the virtual
         // canvas while the scene draws into it.
-        if (_mode == Mode.Explore || _mode == Mode.Inspecting)
+        if (_cubicle.IsOnFirstFrame)
         {
-            _turn3d.SetParameter("MatrixTransform", _camera3d.CalculateMatrixTransform());
+            _turn3d.SetParameter("MatrixTransform", _camera * _camera3d.CalculateMatrixTransform());
             foreach (var inspectable in _inspectables)
             {
-                inspectable.Draw(Core.SpriteBatch, _turn3d, ArtSampler);
+                inspectable.Draw(Core.SpriteBatch, _turn3d, SceneSampler);
             }
         }
 
         Core.SpriteBatch.Begin(samplerState: ArtSampler, transformMatrix: _camera);
 
-        // The close-up monitor only exists while the cubicle faces it, and fades
-        // in with the zoom (and out again when zooming back out).
-        if (_mode == Mode.Terminal || _mode == Mode.Leaving)
+        // The close-up monitor only exists while the cubicle faces it.
+        if (_monitor != null && _monitorOpacity > 0f)
         {
-            _monitor.Opacity = MathHelper.Clamp(_zoomT / MonitorFadeEnd, 0f, 1f);
+            _monitor.Opacity = _monitorOpacity;
             _monitor.Draw(Core.SpriteBatch);
         }
 
@@ -311,24 +356,46 @@ public class GameScene : Scene
         var cursor = GumService.Default.Cursor;
         if (cursor.PrimaryPush
             && IsCursorInsideGame()
-            && !IsCursorOver(_monitor.ScreenBounds)
+            && !IsCursorOver(ScreenBounds)
             && !_clipboard.Contains(cursor.XRespectingGumZoomAndBounds(), cursor.YRespectingGumZoomAndBounds()))
         {
             SetMode(Mode.Leaving);
         }
     }
 
+    private void UpdateTurningIn()
+    {
+        if (_zoomTo < 1f && _cubicle.TurnProgress >= TurnZoomStart)
+        {
+            StartZoom(1f);
+        }
+
+        if (!_cubicle.IsTurning)
+        {
+            // The zoom is normally already under way; this only starts it when
+            // TurnZoomStart waits for the end of the turn.
+            if (_zoomTo < 1f)
+            {
+                StartZoom(1f);
+            }
+
+            _handoffZoom = _zoomT;
+            _mode = Mode.Terminal;
+        }
+    }
+
     private void UpdateLeaving()
     {
         // Clicking the screen while zooming out reverses back into the terminal.
-        if (GumService.Default.Cursor.PrimaryPush && IsCursorOver(_monitor.ScreenBounds))
+        if (GumService.Default.Cursor.PrimaryPush && IsCursorOver(ScreenBounds))
         {
             SetMode(Mode.Terminal);
             return;
         }
 
-        // Fully zoomed out: turn the cubicle back to the angled view.
-        if (_zoomElapsed >= _zoomDuration)
+        // Back at the zoom where the turn in ended: start turning the cubicle
+        // back to the angled view while the zoom finishes, mirroring the way in.
+        if (_zoomT <= _handoffZoom || _zoomElapsed >= _zoomDuration)
         {
             _mode = Mode.TurningOut;
             _cubicle.TurnAway();
@@ -356,11 +423,16 @@ public class GameScene : Scene
     private void SetMode(Mode mode)
     {
         _mode = mode;
+        StartZoom(mode == Mode.Terminal ? 1f : 0f);
+    }
 
+    /// <summary>Starts a zoom tween toward <paramref name="target"/> (0 = explore, 1 = terminal).</summary>
+    private void StartZoom(float target)
+    {
         // Start a fresh tween from the current position. A reversal halfway
         // through only has half the distance to cover, so it gets half the time.
         _zoomFrom = _zoomT;
-        _zoomTo = mode == Mode.Terminal ? 1f : 0f;
+        _zoomTo = target;
         _zoomElapsed = 0f;
         _zoomDuration = ZoomDuration * Math.Abs(_zoomTo - _zoomFrom);
     }
@@ -370,7 +442,8 @@ public class GameScene : Scene
     {
         _zoomElapsed += (float)gameTime.ElapsedGameTime.TotalSeconds;
         float x = _zoomDuration > 0f ? Math.Min(_zoomElapsed / _zoomDuration, 1f) : 1f;
-        _zoomT = MathHelper.Lerp(_zoomFrom, _zoomTo, ZoomEasing(x));
+        Func<float, float> easing = _zoomTo < _zoomFrom ? ZoomOutEasing : ZoomInEasing;
+        _zoomT = MathHelper.Lerp(_zoomFrom, _zoomTo, easing(x));
 
         // Scale is z^t, not a lerp from 1 to z: we perceive zoom as ratios, so
         // equal steps of t should multiply the size by equal factors. A linear
@@ -395,6 +468,12 @@ public class GameScene : Scene
         return Vector2.Transform(screenPoint, Matrix.Invert(_camera));
     }
 
+    /// <summary>
+    /// The monitor's screen in world space, in terminal mode: the close-up's
+    /// with the prototype art, the scene's own (last frame) with Neo's room.
+    /// </summary>
+    private Rectangle ScreenBounds => _monitor?.ScreenBounds ?? _cubicle.FrontScreenBounds.Value;
+
     private bool IsCursorOver(Rectangle worldBounds)
     {
         return worldBounds.Contains(CursorWorldPosition());
@@ -407,7 +486,7 @@ public class GameScene : Scene
     /// </summary>
     private void ComputeTerminalView()
     {
-        Rectangle screen = _monitor.ScreenBounds;
+        Rectangle screen = ScreenBounds;
 
         float areaWidth = Core.VirtualWidth - TerminalMargin * 2;
         float areaHeight = _clipboard.Top - TerminalMargin * 2;
