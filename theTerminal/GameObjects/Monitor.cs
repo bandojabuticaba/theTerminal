@@ -8,6 +8,8 @@ namespace theTerminal.GameObjects;
 /// <summary>
 /// The close-up monitor (prototype art), laid over the cubicle once it has
 /// turned to face the monitor, and the thing the terminal zoom pushes into.
+/// Not used with Neo's room (see Cubicle.UseNeoRoom), which zooms into its own
+/// monitor.
 /// The art is high resolution (748x804) so it still looks sharp after the
 /// zoom; it starts scaled down to cover the monitor in the scene.
 /// </summary>

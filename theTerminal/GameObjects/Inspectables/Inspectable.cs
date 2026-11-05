@@ -13,7 +13,7 @@ namespace theTerminal.GameObjects.Inspectables;
 /// </summary>
 /// <remarks>
 /// <para>
-/// Each object is a subclass (see <see cref="CoffeeMug"/>): it picks its sprite
+/// Each object is a subclass (see <see cref="ComputerMouse"/>): it picks its sprite
 /// and says what the details panel shows; the hover, turn, placement and click
 /// handling all live here. Override <see cref="OnInspect"/> for behavior on
 /// click, and use <see cref="TimesInspected"/> for text that changes once the
@@ -21,9 +21,8 @@ namespace theTerminal.GameObjects.Inspectables;
 /// </para>
 /// <para>
 /// At rest it draws exactly over its spot in the background, so it's invisible
-/// until it turns. The background still has its own copy painted underneath,
-/// which shows around the edges while turning; the final art should leave
-/// that spot empty in the background.
+/// until it turns. It's the room's own sprite, taken out of the room, so
+/// nothing is left underneath.
 /// </para>
 /// </remarks>
 public abstract class Inspectable
@@ -63,20 +62,31 @@ public abstract class Inspectable
     public bool IsHovered { get; private set; }
 
     /// <summary>
-    /// Creates an object from a region cut out of the cubicle's angled frame
-    /// (see prototype-scene-definition.xml), laid exactly over its spot in it.
+    /// Creates an object from one of Neo's room's layers, taken from its angled
+    /// frame (see <see cref="Cubicle.TakeFirstFrameSprite"/>) and drawn in
+    /// its place.
     /// </summary>
-    protected Inspectable(TextureRegion region, Cubicle cubicle)
+    protected Inspectable(PackedSprite packed, Cubicle cubicle)
     {
-        Vector2 position = cubicle.FirstFrameToWorld(region.SourceRectangle.Location);
-        _sprite = new Sprite(region) { Scale = cubicle.Scale };
+        bool isRotated = packed.IsRotated;
+        Vector2 scale = cubicle.Scale;
+        Vector2 position = cubicle.Position + packed.Offset * scale;
+
+        // A sprite stored rotated is turned back upright by the sprite batch;
+        // scale applies before the turn, so its axes swap.
+        _sprite = new Sprite(packed.Region)
+        {
+            Scale = isRotated ? new Vector2(scale.Y, scale.X) : scale,
+            Rotation = isRotated ? -MathHelper.PiOver2 : 0f,
+        };
 
         // Drawn from its center, the point the shader turns and lifts around.
         _sprite.CenterOrigin();
 
-        _halfSize = new Vector2(_sprite.Width, _sprite.Height) / 2f;
+        Vector2 size = isRotated ? new Vector2(_sprite.Height, _sprite.Width) : new Vector2(_sprite.Width, _sprite.Height);
+        _halfSize = size / 2f;
         _center = position + _halfSize;
-        Bounds = new Rectangle(position.ToPoint(), new Point((int)_sprite.Width, (int)_sprite.Height));
+        Bounds = new Rectangle(position.ToPoint(), size.ToPoint());
     }
 
     /// <summary>
