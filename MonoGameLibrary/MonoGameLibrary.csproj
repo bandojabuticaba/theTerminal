@@ -7,7 +7,7 @@
     <!-- Pinned: 3.8.6 breaks Gum UI rendering on DesktopGL (stale scissor state
          after Clear - MonoGame #9586, fixed by #9587 in the 3.8.6.1 release).
          Re-test the Gum UI (clipboard) before unpinning. -->
-    <PackageReference Include="MonoGame.Framework.DesktopGL" Version="3.8.5.1">
+    <PackageReference Include="MonoGame.Framework.DesktopGL" Version="3.8.6.1">
       <PrivateAssets>All</PrivateAssets>
     </PackageReference>
     <PackageReference Include="ImGui.NET" Version="1.91.6.1" />
