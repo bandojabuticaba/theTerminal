@@ -51,21 +51,9 @@
       <_ContentOutputDir>$(MSBuildThisFileDirectory)Content\bin\$(MonoGamePlatform)</_ContentOutputDir>
       <_ContentIntermediateDir>$(MSBuildThisFileDirectory)Content\obj\$(MonoGamePlatform)</_ContentIntermediateDir>
     </PropertyGroup>
-    <!-- CI pre-builds content once (on Windows, avoiding Wine) and stages it into
+    <!-- CI pre-builds content once and stages it into
          _ContentOutputDir, then passes -p:SkipContentBuild=true so these two steps
          are skipped and the pre-staged files are picked up by the ItemGroup below. -->
-    <!-- macOS-only: CrossOver's own `wine` does its own bottle management and
-         ignores WINEPREFIX, so MGFXC (which expects stock Wine) can't drive it
-         directly. Point mgfxc at $(HOME)/.winemonogame-wrappers/{wine,winepath}
-         instead - thin scripts that call CrossOver's raw wineloader binary
-         directly. Scoped to just this Exec (not the shell profile) so it can't
-         affect `wine` anywhere else on the machine, e.g. CrossOver bottles for
-         other Windows apps. Empty on every other OS, so EnvironmentVariables
-         below is a no-op there - important on Windows, where PATH uses `;` not
-         `:` and an unconditional value here would corrupt PATH for this Exec. -->
-    <PropertyGroup Condition="$([MSBuild]::IsOSPlatform('OSX'))">
-      <_WineEnv>PATH=$(HOME)/.winemonogame-wrappers:$(PATH);MGFXC_WINE_PATH=$(HOME)/.winemonogame</_WineEnv>
-    </PropertyGroup>
     <MSBuild Condition="'$(SkipContentBuild)' != 'true'" Projects="$(_ContentBuilderProject)" Targets="Build" Properties="Configuration=Release" RemoveProperties="RuntimeIdentifier;RuntimeIdentifiers;SelfContained;PublishReadyToRun;PublishSingleFile;PublishTrimmed" />
     <!-- WorkingDirectory is required here: Exec otherwise inherits the cwd of
          whatever process invoked this build (e.g. the repo root when running
@@ -74,7 +62,7 @@
          below resolves against that inherited cwd, so building from outside
          this folder makes it point at the wrong place, silently building
          zero content instead of failing loudly. -->
-    <Exec Condition="'$(SkipContentBuild)' != 'true'" EnvironmentVariables="$(_WineEnv)" WorkingDirectory="$(MSBuildThisFileDirectory)" Command="dotnet run --project &quot;$(_ContentBuilderProject)&quot; -c Release --no-build -- build -p $(MonoGamePlatform) --workingDir &quot;$(MSBuildThisFileDirectory)..\Content&quot; -s Assets -o &quot;$(_ContentOutputDir.TrimEnd('\'))&quot; -i &quot;$(_ContentIntermediateDir.TrimEnd('\'))&quot;" />
+    <Exec Condition="'$(SkipContentBuild)' != 'true'" WorkingDirectory="$(MSBuildThisFileDirectory)" Command="dotnet run --project &quot;$(_ContentBuilderProject)&quot; -c Release --no-build -- build -p $(MonoGamePlatform) --workingDir &quot;$(MSBuildThisFileDirectory)..\Content&quot; -s Assets -o &quot;$(_ContentOutputDir.TrimEnd('\'))&quot; -i &quot;$(_ContentIntermediateDir.TrimEnd('\'))&quot;" />
     <ItemGroup>
       <_BuiltContent Include="$(_ContentOutputDir)\**\*.*" />
       <Content Include="@(_BuiltContent)">

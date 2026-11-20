@@ -13,9 +13,9 @@ jobs:
   # theTerminal.csproj builds content for MonoGamePlatform=DesktopVK, so the
   # built Content (including compiled .fx effects) is identical across all
   # three OSes below - only the native game executable differs per RID. Build
-  # it once here, on Windows, where the shader compiler runs natively (no
-  # Wine/fxccs.dll setup needed), and share it with the other legs instead of
-  # each of them repeating an effect-compile that needs Wine.
+  # it once here and share it with the other legs instead of each of them
+  # repeating the same content build. (DesktopVK compiles effects with DXC,
+  # which runs natively on every OS, so this job isn't tied to Windows.)
   build-content:
     name: Build Content
     runs-on: windows-latest
