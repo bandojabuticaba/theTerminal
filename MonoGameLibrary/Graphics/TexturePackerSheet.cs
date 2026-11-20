@@ -5,6 +5,7 @@ using System.IO;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Content;
 using Microsoft.Xna.Framework.Graphics;
+using MonoGameLibrary.Content;
 
 namespace MonoGameLibrary.Graphics;
 
@@ -41,9 +42,7 @@ public class TexturePackerSheet
         string texturePath = Path.ChangeExtension(fileName, null);
         var sheet = new TexturePackerSheet(content.Load<Texture2D>(texturePath));
 
-        string filePath = Path.Combine(content.RootDirectory, fileName);
-
-        using Stream stream = TitleContainer.OpenStream(filePath);
+        using Stream stream = content.OpenStream(fileName);
         using var reader = new StreamReader(stream);
 
         // Each line is:

@@ -10,7 +10,7 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  # theTerminal.csproj only references MonoGame.Framework.DesktopGL, so the
+  # theTerminal.csproj builds content for MonoGamePlatform=DesktopVK, so the
   # built Content (including compiled .fx effects) is identical across all
   # three OSes below - only the native game executable differs per RID. Build
   # it once here, on Windows, where the shader compiler runs natively (no
@@ -44,8 +44,8 @@ jobs:
         with:
           name: game-content
           path: |
-            theTerminal/Content/bin/DesktopGL
-            MonoGameLibrary/Content/bin/DesktopGL
+            theTerminal/Content/bin/DesktopVK
+            MonoGameLibrary/Content/bin/DesktopVK
 
   build:
     needs: build-content

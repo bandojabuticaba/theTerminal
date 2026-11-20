@@ -5,6 +5,10 @@
     <RollForward>Major</RollForward>
     <PublishReadyToRun>false</PublishReadyToRun>
     <TieredCompilation>false</TieredCompilation>
+    <!-- Content (notably .fx effects) is built for Vulkan. Set explicitly: unlike
+         MonoGame.Framework.DesktopGL, MonoGame.Framework.Native ships no build
+         targets that would set it for us. -->
+    <MonoGamePlatform>DesktopVK</MonoGamePlatform>
   </PropertyGroup>
   <PropertyGroup>
     <ApplicationManifest>app.manifest</ApplicationManifest>
@@ -24,21 +28,24 @@
   </ItemGroup>
   <ItemGroup>
     <PackageReference Include="Gum.MonoGame" Version="2026.11.2.1" />
-    <!-- Pinned: 3.8.6 breaks Gum UI rendering on DesktopGL (stale scissor state
+    <!-- Pinned: 3.8.6 broke Gum UI rendering on DesktopGL (stale scissor state
          after Clear - MonoGame #9586, fixed by #9587 in the 3.8.6.1 release).
          Re-test the Gum UI (clipboard) before unpinning. -->
-    <PackageReference Include="MonoGame.Framework.DesktopGL" Version="3.8.6.1" />
+    <PackageReference Include="MonoGame.Framework.Native" Version="3.8.6.1" />
+    <PackageReference Include="MonoGame.Runtime.Windows.Vulkan" Version="3.8.6.1" />
+    <PackageReference Include="MonoGame.Runtime.Mac.Vulkan" Version="3.8.6.1" />
+    <PackageReference Include="MonoGame.Runtime.Linux.Vulkan" Version="3.8.6.1" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="../MonoGameLibrary/MonoGameLibrary.csproj" />
   </ItemGroup>
   <Target Name="RunContentBuilder" BeforeTargets="BeforeCompile" AfterTargets="ResolveProjectReferences">
-    <!-- These must be evaluated here (execute-time), not in a top-level PropertyGroup
-         (evaluate-time): $(MonoGamePlatform) is set by MonoGame.Framework.DesktopGL's
-         own build targets, which an SDK-style project only imports at the very end -
-         after any top-level PropertyGroup has already evaluated. Computing these
-         eagerly silently resolved $(MonoGamePlatform) to empty, so content built into
-         Content\bin\ instead of Content\bin\DesktopGL\. -->
+    <!-- Evaluated here (execute-time) rather than in a top-level PropertyGroup:
+         $(MonoGamePlatform) used to come from MonoGame.Framework.DesktopGL's build
+         targets, imported after any top-level PropertyGroup had evaluated, which
+         silently resolved it to empty and built content into Content\bin\ instead
+         of Content\bin\DesktopGL\. It is now set at the top of this file, but
+         keeping these here stays safe if a future package sets it late again. -->
     <PropertyGroup>
       <_ContentBuilderProject>$(MSBuildThisFileDirectory)..\Content\Content.csproj</_ContentBuilderProject>
       <_ContentOutputDir>$(MSBuildThisFileDirectory)Content\bin\$(MonoGamePlatform)</_ContentOutputDir>

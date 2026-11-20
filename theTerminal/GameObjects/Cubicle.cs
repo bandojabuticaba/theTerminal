@@ -5,6 +5,7 @@ using System.Text.Json;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Content;
 using Microsoft.Xna.Framework.Graphics;
+using MonoGameLibrary.Content;
 using MonoGameLibrary.Graphics;
 
 namespace theTerminal.GameObjects;
@@ -120,7 +121,7 @@ public class Cubicle
             var sheet = TexturePackerSheet.FromFile(content, "images/neoroom.txt");
             Texture = sheet.Texture;
 
-            using Stream stream = TitleContainer.OpenStream(Path.Combine(content.RootDirectory, "images/neoroom.json"));
+            using Stream stream = content.OpenStream("images/neoroom.json");
             using JsonDocument scene = JsonDocument.Parse(stream);
             JsonElement root = scene.RootElement;
 

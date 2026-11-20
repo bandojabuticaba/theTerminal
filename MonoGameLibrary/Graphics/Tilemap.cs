@@ -5,6 +5,7 @@ using System.Xml.Linq;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Content;
 using Microsoft.Xna.Framework.Graphics;
+using MonoGameLibrary.Content;
 
 namespace MonoGameLibrary.Graphics;
 
@@ -134,9 +135,7 @@ public class Tilemap
     /// <returns>The tilemap created by this method.</returns>
     public static Tilemap FromFile(ContentManager content, string filename)
     {
-        string filePath = Path.Combine(content.RootDirectory, filename);
-
-        using (Stream stream = TitleContainer.OpenStream(filePath))
+        using (Stream stream = content.OpenStream(filename))
         {
             using (XmlReader reader = XmlReader.Create(stream))
             {

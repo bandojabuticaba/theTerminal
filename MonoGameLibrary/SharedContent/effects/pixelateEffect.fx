@@ -1,19 +1,12 @@
-#if OPENGL
-   #define SV_POSITION POSITION
-   #define VS_SHADERMODEL vs_3_0
-   #define PS_SHADERMODEL ps_3_0
-#else
-   #define VS_SHADERMODEL vs_4_0_level_9_1
-   #define PS_SHADERMODEL ps_4_0_level_9_1
-#endif
+#include "platform.fxh"
 
 // Based on https://github.com/educrod/shaders/blob/master/Content/Pixelation.fx,
 // but working in the sprite's texture space instead of a fixed screen size, so
 // it pixelates a single sprite at whatever scale and position it is drawn.
 
 // the main Sprite texture passed to SpriteBatch.Draw()
-Texture2D SpriteTexture;
-sampler2D SpriteTextureSampler = sampler_state
+Texture2D SpriteTexture : register(t0);
+sampler2D SpriteTextureSampler : register(s0) = sampler_state
 {
    Texture = <SpriteTexture>;
 };
@@ -25,14 +18,14 @@ float2 TextureSize;
 // (crisp, like point sampling); 4 merges every 4x4 texels into one block.
 float PixelSize;
 
-float4 PixelatePS(float4 position : SV_POSITION, float4 color : COLOR0, float2 uv : TEXCOORD0) : COLOR0
+float4 PixelatePS(float4 position : SV_POSITION, float4 color : COLOR0, float2 uv : TEXCOORD0) : COLOR
 {
    // Snap to the center of the block this pixel falls in. floor + 0.5 rather
    // than round, so every block samples inside itself and never its neighbor.
    float2 texel = uv * TextureSize;
    float2 block = (floor(texel / PixelSize) + 0.5) * PixelSize;
 
-   return tex2D(SpriteTextureSampler, block / TextureSize) * color;
+   return SAMPLE_TEXTURE(SpriteTexture, block / TextureSize) * color;
 }
 
 technique SpriteDrawing

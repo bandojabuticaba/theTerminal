@@ -2,6 +2,7 @@ using System;
 using System.Diagnostics;
 using System.IO;
 using System.Reflection;
+using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Content;
 using Microsoft.Xna.Framework.Graphics;
 using MonoGameLibrary.Graphics;
@@ -19,6 +20,29 @@ public static class ContentManagerExtensions
     {
         T asset = content.Load<T>(assetName);
         return new WatchedAsset<T>(content, assetName, asset);
+    }
+
+    /// <summary>
+    /// Opens a raw file (one copied rather than built, e.g. .json or .xml) relative
+    /// to the content root, fully read into memory. Use this instead of
+    /// <see cref="TitleContainer.OpenStream"/>: on MonoGame's native backends
+    /// (DesktopVK, DesktopGL4) that stream's Read ignores its offset argument, so
+    /// readers that fill a buffer in chunks (JsonDocument, XmlReader) get corrupted
+    /// data. StreamReader only happens to work because it always reads at offset 0.
+    /// Workaround for MonoGame 3.8.6.1:
+    ///   Issue: https://github.com/MonoGame/MonoGame/issues/9578
+    ///   Fix:   https://github.com/MonoGame/MonoGame/pull/9599
+    /// Once a release includes that fix, the copy can go: return
+    /// TitleContainer.OpenStream directly and check that Cubicle's JSON and the
+    /// XML atlases still load.
+    /// </summary>
+    public static MemoryStream OpenStream(this ContentManager content, string fileName)
+    {
+        using Stream source = TitleContainer.OpenStream(Path.Combine(content.RootDirectory, fileName));
+        var stream = new MemoryStream();
+        source.CopyTo(stream);
+        stream.Position = 0;
+        return stream;
     }
 
     /// <summary>
