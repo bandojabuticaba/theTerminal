@@ -6,6 +6,7 @@ using System.Xml.Linq;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Content;
 using Microsoft.Xna.Framework.Graphics;
+using MonoGameLibrary.Content;
 
 namespace MonoGameLibrary.Graphics;
 
@@ -126,9 +127,7 @@ public class TextureAtlas
     {
         TextureAtlas atlas = new TextureAtlas();
 
-        string filePath = Path.Combine(content.RootDirectory, fileName);
-
-        using (Stream stream = TitleContainer.OpenStream(filePath))
+        using (Stream stream = content.OpenStream(fileName))
         {
             using (XmlReader reader = XmlReader.Create(stream))
             {

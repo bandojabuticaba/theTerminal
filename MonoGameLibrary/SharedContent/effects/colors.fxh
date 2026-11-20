@@ -4,8 +4,8 @@
 #include "common.fxh"
 
 // the custom color map passed to the Material.SetParameter()
-Texture2D ColorMap;
-sampler2D ColorMapSampler = sampler_state
+Texture2D ColorMap : register(t1);
+sampler2D ColorMapSampler : register(s1) = sampler_state
 {
     Texture = <ColorMap>;
     MinFilter = Point;
@@ -42,7 +42,7 @@ float4 SwapColors(float4 color)
     float2 keyUv = float2(color.r , 0);
     
     // read the swap color value
-    float4 swappedColor = tex2D(ColorMapSampler, keyUv) * color.a;
+    float4 swappedColor = SAMPLE_TEXTURE(ColorMap, keyUv) * color.a;
     
     // ignore the swap if the map does not have a value
     bool hasSwapColor = swappedColor.a > 0;
@@ -58,7 +58,7 @@ float4 SwapColors(float4 color)
 float4 ColorSwapPS(VertexShaderOutput input) : COLOR
 {
     // read the original color value
-    float4 originalColor = tex2D(SpriteTextureSampler,input.TextureCoordinates);
+    float4 originalColor = SAMPLE_TEXTURE(SpriteTexture,input.TextureCoordinates);
 
     float4 swapped = SwapColors(originalColor);
     float4 saturated = Grayscale(swapped);

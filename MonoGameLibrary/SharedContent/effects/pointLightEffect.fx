@@ -1,24 +1,17 @@
-#if OPENGL
-	#define SV_POSITION POSITION
-	#define VS_SHADERMODEL vs_3_0
-	#define PS_SHADERMODEL ps_3_0
-#else
-	#define VS_SHADERMODEL vs_4_0_level_9_1
-	#define PS_SHADERMODEL ps_4_0_level_9_1
-#endif
+#include "platform.fxh"
 #include "3dEffect.fxh"
 
-Texture2D SpriteTexture;
+Texture2D SpriteTexture : register(t0);
 float LightBrightness; 
 float LightSharpness;  
 
-sampler2D SpriteTextureSampler = sampler_state
+sampler2D SpriteTextureSampler : register(s0) = sampler_state
 {
 	Texture = <SpriteTexture>;
 };
 
-Texture2D NormalBuffer;  
-sampler2D NormalBufferSampler = sampler_state  
+Texture2D NormalBuffer : register(t1);  
+sampler2D NormalBufferSampler : register(s1) = sampler_state  
 {  
    Texture = <NormalBuffer>;  
 };
@@ -65,7 +58,7 @@ float4 MainPS(LightVertexShaderOutput input) : COLOR {
     float2 screenCoords = .5*(input.ScreenData.xy + 1);
     screenCoords.y = 1 - screenCoords.y;
    
-   float4 normal = tex2D(NormalBufferSampler,screenCoords);
+   float4 normal = SAMPLE_TEXTURE(NormalBuffer,screenCoords);
    // flip the y of the normals, because the art assets have them backwards.
     normal.y = 1 - normal.y;
 

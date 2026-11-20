@@ -1,15 +1,8 @@
-#if OPENGL
-    #define SV_POSITION POSITION
-    #define VS_SHADERMODEL vs_3_0
-    #define PS_SHADERMODEL ps_3_0
-#else
-    #define VS_SHADERMODEL vs_4_0_level_9_1
-    #define PS_SHADERMODEL ps_4_0_level_9_1
-#endif
+#include "platform.fxh"
 
-Texture2D SpriteTexture;
+Texture2D SpriteTexture : register(t0);
 
-sampler2D SpriteTextureSampler = sampler_state
+sampler2D SpriteTextureSampler : register(s0) = sampler_state
 {
     Texture = <SpriteTexture>;
 };
@@ -18,7 +11,7 @@ sampler2D SpriteTextureSampler = sampler_state
 
 float4 MainPS(VertexShaderOutput input) : COLOR
 {
-    return tex2D(SpriteTextureSampler,input.TextureCoordinates) * input.Color;
+    return SAMPLE_TEXTURE(SpriteTexture,input.TextureCoordinates) * input.Color;
 }
 
 technique SpriteDrawing

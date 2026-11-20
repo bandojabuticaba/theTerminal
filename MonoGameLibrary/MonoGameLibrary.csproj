@@ -2,12 +2,16 @@
   <PropertyGroup>
     <TargetFramework>net10.0</TargetFramework>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <!-- Needed by BuildSharedContent below. MonoGame.Framework.Native ships no build
+         targets, so nothing else sets it (MonoGame.Framework.DesktopGL used to). -->
+    <MonoGamePlatform>DesktopVK</MonoGamePlatform>
   </PropertyGroup>
   <ItemGroup>
-    <!-- Pinned: 3.8.6 breaks Gum UI rendering on DesktopGL (stale scissor state
+    <!-- Pinned: 3.8.6 broke Gum UI rendering on DesktopGL (stale scissor state
          after Clear - MonoGame #9586, fixed by #9587 in the 3.8.6.1 release).
-         Re-test the Gum UI (clipboard) before unpinning. -->
-    <PackageReference Include="MonoGame.Framework.DesktopGL" Version="3.8.6.1">
+         Re-test the Gum UI (clipboard) before unpinning. Only the API assembly is
+         needed here; the per-OS Vulkan runtimes are referenced by the game. -->
+    <PackageReference Include="MonoGame.Framework.Native" Version="3.8.6.1">
       <PrivateAssets>All</PrivateAssets>
     </PackageReference>
     <PackageReference Include="ImGui.NET" Version="1.91.6.1" />
@@ -27,10 +31,9 @@
        to consumers, so the xnbs never reach the game's output folder. -->
   <Target Name="BuildSharedContent" BeforeTargets="AssignTargetPaths">
     <PropertyGroup>
-      <!-- Evaluated here rather than in a top-level PropertyGroup: $(MonoGamePlatform)
-           comes from MonoGame.Framework.DesktopGL's targets, imported after any
-           top-level PropertyGroup has evaluated. Same reasoning as the comment in
-           DungeonSlime.csproj's RunContentBuilder. -->
+      <!-- Evaluated here rather than in a top-level PropertyGroup, in case
+           $(MonoGamePlatform) is ever set late by a package's targets again. Same
+           reasoning as the comment in theTerminal.csproj's RunContentBuilder. -->
       <_SharedContentOutputDir>$(MSBuildThisFileDirectory)Content\bin\$(MonoGamePlatform)</_SharedContentOutputDir>
       <_SharedContentIntermediateDir>$(MSBuildThisFileDirectory)Content\obj\$(MonoGamePlatform)</_SharedContentIntermediateDir>
       <!-- Overridable so this library can be dropped into another solution whose
