@@ -2,6 +2,7 @@ using System;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
 using MonoGameLibrary.Graphics;
+using theTerminal.Dialog;
 
 namespace theTerminal.GameObjects.Inspectables;
 
@@ -13,11 +14,12 @@ namespace theTerminal.GameObjects.Inspectables;
 /// </summary>
 /// <remarks>
 /// <para>
-/// Each object is a subclass (see <see cref="ComputerMouse"/>): it picks its sprite
-/// and says what the details panel shows; the hover, turn, placement and click
-/// handling all live here. Override <see cref="OnInspect"/> for behavior on
-/// click, and use <see cref="TimesInspected"/> for text that changes once the
-/// player has looked before.
+/// Each kind of object is a subclass (see <see cref="ComputerMouse"/>) that
+/// picks its sprite; the hover, turn, placement and click handling all live
+/// here. What the details panel says is data, not code: each instance gets an
+/// <see cref="InspectText"/> from its stage's inspect file, so the same class
+/// can say different things in different stages. Override
+/// <see cref="OnInspect"/> for behavior on click.
 /// </para>
 /// <para>
 /// At rest it draws exactly over its spot in the background, so it's invisible
@@ -47,11 +49,18 @@ public abstract class Inspectable
     // How lifted it is: 0 at rest, 1 fully hovered.
     private float _lift;
 
-    /// <summary>The title of the details panel.</summary>
-    public abstract string Name { get; }
+    // The panel's texts, from the stage's inspect file (see InspectTextFile).
+    private readonly InspectText _text;
 
-    /// <summary>The body of the details panel. Read each time it opens, so it can change with state.</summary>
-    public abstract string Description { get; }
+    /// <summary>The title of the details panel. Override only for a title that depends on game state.</summary>
+    public virtual string Name => _text.Name;
+
+    /// <summary>
+    /// The body of the details panel: the text's line for this click (see
+    /// <see cref="InspectText.LineFor"/>). Read each time it opens; override
+    /// for text that depends on game state beyond the click count.
+    /// </summary>
+    public virtual string Description => _text.LineFor(TimesInspected);
 
     /// <summary>How many times the player has clicked it, including the click opening the panel right now.</summary>
     public int TimesInspected { get; private set; }
@@ -66,8 +75,11 @@ public abstract class Inspectable
     /// frame (see <see cref="Cubicle.TakeFirstFrameSprite"/>) and drawn in
     /// its place.
     /// </summary>
-    protected Inspectable(PackedSprite packed, Cubicle cubicle)
+    /// <param name="text">What its details panel shows (see <see cref="InspectTextFile.Get"/>).</param>
+    protected Inspectable(PackedSprite packed, Cubicle cubicle, InspectText text)
     {
+        _text = text;
+
         bool isRotated = packed.IsRotated;
         Vector2 scale = cubicle.Scale;
         Vector2 position = cubicle.Position + packed.Offset * scale;

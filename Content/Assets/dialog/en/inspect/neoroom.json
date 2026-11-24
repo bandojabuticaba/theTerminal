@@ -1,0 +1,12 @@
+// Inspect texts for Neo's room: what the details panel shows when the player
+// clicks an object. Keys are local to this file (the stage), so another stage
+// can have its own "mouse". Each click shows the next line; the last repeats.
+{
+  "mouse": {
+    "name": "Mouse",
+    "lines": [
+      "A beige ball mouse. The cable runs behind the monitor.",
+      "The ball rattles. Someone has been using this while you were asleep."
+    ]
+  }
+}

@@ -8,6 +8,7 @@ using MonoGameLibrary;
 using MonoGameLibrary.Content;
 using MonoGameLibrary.Graphics;
 using MonoGameLibrary.Scenes;
+using theTerminal.Dialog;
 using theTerminal.GameObjects;
 using theTerminal.GameObjects.Inspectables;
 
@@ -180,10 +181,12 @@ public class GameScene : Scene
         _turn3d.IsDebugVisible = ShowInspectEffectDebug;
 
         // The objects the player can click for details (see Inspectable). They
-        // are layers of Neo's room; the prototype art has none.
+        // are layers of Neo's room; the prototype art has none. Their texts come
+        // from the stage's inspect file (Content/Assets/dialog/en/inspect/neoroom.json).
         if (Cubicle.UseNeoRoom)
         {
-            _inspectables.Add(new ComputerMouse(_cubicle));
+            InspectTextFile texts = InspectTextFile.Load(Content, "neoroom");
+            _inspectables.Add(new ComputerMouse(_cubicle, texts.Get("mouse")));
         }
     }
 

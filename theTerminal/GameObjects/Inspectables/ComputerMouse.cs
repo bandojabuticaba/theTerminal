@@ -1,19 +1,17 @@
+using theTerminal.Dialog;
+
 namespace theTerminal.GameObjects.Inspectables;
 
 /// <summary>
-/// The mouse on Neo's desk: the first object taken from Neo's room, to try the
-/// hover and details panel there. It's the room's own mouse layer.
+/// A computer mouse the player can inspect. In Neo's room it's the room's own
+/// "mouse" layer; its text comes from the stage's inspect file, so each mouse
+/// can say something different.
 /// </summary>
 public class ComputerMouse : Inspectable
 {
-    public ComputerMouse(Cubicle cubicle)
-        : base(cubicle.TakeFirstFrameSprite("mouse"), cubicle)
+    /// <param name="layer">The room layer holding its sprite.</param>
+    public ComputerMouse(Cubicle cubicle, InspectText text, string layer = "mouse")
+        : base(cubicle.TakeFirstFrameSprite(layer), cubicle, text)
     {
     }
-
-    public override string Name => "Mouse";
-
-    public override string Description => TimesInspected == 1
-        ? "A beige ball mouse. The cable runs behind the monitor."
-        : "The ball rattles. Someone has been using this while you were asleep.";
 }
