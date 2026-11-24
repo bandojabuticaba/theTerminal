@@ -1,12 +1,11 @@
 // Inspect texts for Neo's room: what the details panel shows when the player
 // clicks an object. Keys are local to this file (the stage), so another stage
-// can have its own "mouse". Each click shows the next line; the last repeats.
+// can have its own "mouse".
+// A collectable word is written inline as {text:type}, type being command,
+// parameter, file or directory.
 {
   "mouse": {
     "name": "Mouse",
-    "lines": [
-      "A beige ball mouse. The cable runs behind the monitor.",
-      "The ball rattles. Someone has been using this while you were asleep."
-    ]
+    "text": "A beige ball mouse. The cable runs behind the monitor. A sticky note under it reads {list:command}."
   }
 }

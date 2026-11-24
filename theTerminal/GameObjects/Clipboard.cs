@@ -10,7 +10,8 @@ namespace theTerminal.GameObjects;
 
 /// <summary>
 /// The clipboard (the game's word bank): a bordered frame at the bottom of the
-/// screen holding the words the player has copied out of files. The frame is divided into a grid of slots so boxes
+/// screen holding the words the player has collected (see <see cref="TryAdd"/>);
+/// it starts empty. The frame is divided into a grid of slots so boxes
 /// stay loosely aligned, but each chip owns its own slot independently - they
 /// don't have to be packed together, and moving one never shifts any other.
 /// Dropping a chip onto another's slot swaps the two; the chip being replaced
@@ -35,14 +36,6 @@ public class Clipboard : IDisposable
     private const float ChipWidth = 130f;
     private const float ChipHeight = 20f;
 
-    private static readonly Word[] s_words =
-    {
-        new Word("list", WordType.Command),
-        new Word("file.txt", WordType.File),
-        new Word("run", WordType.Command),
-        new Word("--hiden", WordType.Parameter),
-    };
-
     private sealed class ChipEntry
     {
         public ContainerRuntime Chip;
@@ -65,11 +58,23 @@ public class Clipboard : IDisposable
         _frame = CreateFrame();
         _columns = (int)((_frame.Width - Padding * 2 + Gap) / (ChipWidth + Gap));
         _totalSlots = _columns * Rows;
+    }
 
-        for (int i = 0; i < s_words.Length; i++)
+    /// <summary>
+    /// Adds a chip for <paramref name="word"/> in the first free slot. Returns
+    /// false when every slot is taken (not handled further yet).
+    /// </summary>
+    public bool TryAdd(Word word)
+    {
+        for (int slot = 0; slot < _totalSlots; slot++)
         {
-            CreateChip(s_words[i], slotIndex: i);
+            if (FindBySlot(slot, excluding: null) == null)
+            {
+                CreateChip(word, slot);
+                return true;
+            }
         }
+        return false;
     }
 
     /// <summary>The top edge of the clipboard frame, in screen space.</summary>
