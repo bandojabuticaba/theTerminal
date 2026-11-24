@@ -15,20 +15,13 @@ public enum WordType
 }
 
 /// <summary>
-/// A single word the player has collected: its text, what kind of thing it
-/// represents, and the color its chip is drawn with.
+/// A single word the player can collect: its text, what kind of thing it
+/// represents, and the color its chip is drawn with. A record, so two words
+/// with the same text and type are equal (see <see cref="WordCollection"/>).
 /// </summary>
-public class Word
+public record Word(string Text, WordType Type)
 {
-    public string Text { get; }
-    public WordType Type { get; }
     public Color Color => GetColor(Type);
-
-    public Word(string text, WordType type)
-    {
-        Text = text;
-        Type = type;
-    }
 
     private static Color GetColor(WordType type) => type switch
     {

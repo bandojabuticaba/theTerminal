@@ -56,11 +56,9 @@ public abstract class Inspectable
     public virtual string Name => _text.Name;
 
     /// <summary>
-    /// The body of the details panel: the text's line for this click (see
-    /// <see cref="InspectText.LineFor"/>). Read each time it opens; override
-    /// for text that depends on game state beyond the click count.
+    /// The body of the details panel. Override for text that depends on game state.
     /// </summary>
-    public virtual string Description => _text.LineFor(TimesInspected);
+    public virtual string Description => _text.Text;
 
     /// <summary>How many times the player has clicked it, including the click opening the panel right now.</summary>
     public int TimesInspected { get; private set; }

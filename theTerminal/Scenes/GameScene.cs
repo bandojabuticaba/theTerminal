@@ -116,6 +116,10 @@ public class GameScene : Scene
     private readonly List<Inspectable> _inspectables = new();
     private InspectPanel _inspectPanel;
 
+    // The words the player has collected. In memory for now; it's the state
+    // to persist later (see WordCollection).
+    private readonly WordCollection _words = new();
+
     private Mode _mode = Mode.Explore;
     private Matrix _camera = Matrix.Identity;
 
@@ -327,7 +331,7 @@ public class GameScene : Scene
             if (inspectable.IsHovered)
             {
                 inspectable.Inspect();
-                _inspectPanel.Show(inspectable);
+                _inspectPanel.Show(inspectable, _words);
                 _mode = Mode.Inspecting;
                 return;
             }
@@ -337,9 +341,26 @@ public class GameScene : Scene
     private void UpdateInspecting()
     {
         var cursor = GumService.Default.Cursor;
+        float x = cursor.XRespectingGumZoomAndBounds();
+        float y = cursor.YRespectingGumZoomAndBounds();
+
+        // Clicking an available word copies it to the clipboard and marks it
+        // collected; a collected word ignores clicks, even once it has left
+        // the clipboard. Collected only if the clipboard took it, so a word
+        // is never lost.
+        if (cursor.PrimaryPush
+            && _inspectPanel.TryGetWordAt(x, y, out Word word)
+            && _words.StatusOf(word) == WordStatus.Available
+            && _clipboard.TryAdd(word))
+        {
+            _words.Collect(word);
+            _inspectPanel.RefreshLinks();
+            return;
+        }
+
         bool clickedOutside = cursor.PrimaryPush
             && IsCursorInsideGame()
-            && !_inspectPanel.Contains(cursor.XRespectingGumZoomAndBounds(), cursor.YRespectingGumZoomAndBounds());
+            && !_inspectPanel.Contains(x, y);
 
         if (Core.Input.Keyboard.WasKeyJustPressed(Keys.Escape) || clickedOutside)
         {
