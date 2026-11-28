@@ -5,7 +5,7 @@
 # https://www.codeandweb.com/texturepacker/monogame
 #
 # Sprite sheet: neoroom.png (3924 x 2048)
-# $TexturePacker:SmartUpdate:83d79c11bbed92c421c9c49676daae44:97adb9986f197e8c63909f843e4da520:a36b0394793b37ca4cdce816667fed48$
+# $TexturePacker:SmartUpdate:80be0c8605586598a61fd71b5c2df579:ac06dcd508f4c9d0d5c174a6af7eea6b:a36b0394793b37ca4cdce816667fed48$
 #
 
 background/turn-1;0;1;1;720;405;720;405;0.5;0.5

@@ -11,6 +11,7 @@ using MonoGameLibrary.Scenes;
 using theTerminal.Dialog;
 using theTerminal.GameObjects;
 using theTerminal.GameObjects.Inspectables;
+using theTerminal.Shell;
 
 namespace theTerminal.Scenes;
 
@@ -106,10 +107,15 @@ public class GameScene : Scene
     private static readonly SamplerState SceneSampler = Cubicle.UseNeoRoom ? SamplerState.PointClamp : ArtSampler;
 
     private Clipboard _clipboard;
+    private TerminalButtons _terminalButtons;
     private Cubicle _cubicle;
 
     // The prototype close-up; null with Neo's room, which has none.
     private Monitor _monitor;
+    private Terminal _terminal;
+
+    // The stage computer's files and the commands that act on them.
+    private CommandInterpreter _shell;
     private Material _pixelate;
     private Material _turn3d;
     private readonly SpriteCamera3d _camera3d = new();
@@ -152,8 +158,22 @@ public class GameScene : Scene
         base.Initialize();
 
         _clipboard = new Clipboard();
+        _clipboard.WordDroppedOutside = OnWordDropped;
+
+        _terminalButtons = new TerminalButtons(_clipboard.ButtonArea);
+        _terminalButtons.EnterClicked = SubmitCommand;
+        _terminalButtons.BackspaceClicked = () => _terminal.RemoveLastWord();
         _inspectPanel = new InspectPanel(areaHeight: _clipboard.Top);
         ComputeTerminalView();
+
+        // The terminal renders at the size the screen has in terminal mode, so
+        // its text is drawn 1:1 there and only ever scaled down.
+        Rectangle screen = ScreenBounds;
+        var terminalSize = new Point(
+            (int)MathF.Ceiling(screen.Width * _terminalZoom),
+            (int)MathF.Ceiling(screen.Height * _terminalZoom));
+        _terminal = new Terminal(Content, Core.GraphicsDevice, terminalSize);
+        _shell = new CommandInterpreter(FileSystem.Load(Content, "neoroom"));
     }
 
     public override void LoadContent()
@@ -196,11 +216,17 @@ public class GameScene : Scene
 
     public override void Update(GameTime gameTime)
     {
+        // The terminal's buttons only work in terminal mode, like dropping
+        // words on the screen; set before Gum updates, so a click this frame
+        // is judged by this frame's mode.
+        _terminalButtons.IsEnabled = _mode == Mode.Terminal;
+
         // Gum first, so the clipboard polls this frame's cursor state.
         GumService.Default.Update(gameTime);
         _clipboard.Update(gameTime);
 
         _cubicle.Update(gameTime);
+        _terminal.Update(gameTime);
         UpdateZoom(gameTime);
         _pixelate.Update();
         _turn3d.Update();
@@ -252,6 +278,12 @@ public class GameScene : Scene
 
     public override void Draw(GameTime gameTime)
     {
+        // The terminal goes first: rendering it switches render targets, and
+        // switching back may lose what's already on the canvas, so it's cleared
+        // again (Core cleared it just before) and the scene drawn after.
+        _terminal.Render();
+        Core.GraphicsDevice.Clear(Color.Black);
+
         // Drawn inside the scene so Core's transition overlay covers it.
         // The scene gets blockier as the camera zooms in, in whole-texel steps so
         // the blocks snap rather than swim. Only once the close-up has taken over
@@ -260,11 +292,23 @@ public class GameScene : Scene
         int pixelSize = 1 + (int)MathF.Round((MaxScenePixelSize - 1) * pixelation);
         _pixelate.SetParameter("PixelSize", pixelSize);
 
-        Core.SpriteBatch.Begin(
-            samplerState: SceneSampler,
-            transformMatrix: _camera,
-            effect: pixelSize > 1 ? _pixelate.Effect : null);
-        _cubicle.Draw(Core.SpriteBatch);
+        // The room in two halves with the terminal between them: on the
+        // monitor's screen, under whatever is in front of it (keyboard, chair).
+        // With Neo's room it follows the screen through every frame of the
+        // turn; the prototype art only knows the close-up's screen (below).
+        Effect sceneEffect = pixelSize > 1 ? _pixelate.Effect : null;
+        Core.SpriteBatch.Begin(samplerState: SceneSampler, transformMatrix: _camera, effect: sceneEffect);
+        _cubicle.DrawBehindScreen(Core.SpriteBatch);
+        Core.SpriteBatch.End();
+
+        Vector2[] screenCorners = _cubicle.ScreenCorners;
+        if (screenCorners != null)
+        {
+            _terminal.Draw(screenCorners, _camera);
+        }
+
+        Core.SpriteBatch.Begin(samplerState: SceneSampler, transformMatrix: _camera, effect: sceneEffect);
+        _cubicle.DrawInFrontOfScreen(Core.SpriteBatch);
         Core.SpriteBatch.End();
 
         // Inspectables are part of the angled frame (Neo's room hands them its
@@ -293,13 +337,28 @@ public class GameScene : Scene
 
         Core.SpriteBatch.End();
 
+        // The prototype art's terminal: on the close-up's screen, fading in
+        // with it once the cubicle faces the monitor.
+        if (_monitor != null && _monitorOpacity > 0f)
+        {
+            Rectangle screen = ScreenBounds;
+            Vector2[] corners =
+            [
+                new(screen.Left, screen.Top), new(screen.Right, screen.Top),
+                new(screen.Right, screen.Bottom), new(screen.Left, screen.Bottom),
+            ];
+            _terminal.Draw(corners, _camera, _monitorOpacity);
+        }
+
         GumService.Default.Draw();
     }
 
     public override void UnloadContent()
     {
         _clipboard?.Dispose();
+        _terminalButtons?.Dispose();
         _inspectPanel?.Dispose();
+        _terminal?.Dispose();
 
         base.UnloadContent();
     }
@@ -377,6 +436,16 @@ public class GameScene : Scene
             return;
         }
 
+        // The keyboard keys do the same as the buttons.
+        if (Core.Input.Keyboard.WasKeyJustPressed(Keys.Back))
+        {
+            _terminal.RemoveLastWord();
+        }
+        if (Core.Input.Keyboard.WasKeyJustPressed(Keys.Enter))
+        {
+            SubmitCommand();
+        }
+
         var cursor = GumService.Default.Cursor;
         if (cursor.PrimaryPush
             && IsCursorInsideGame()
@@ -384,6 +453,31 @@ public class GameScene : Scene
             && !_clipboard.Contains(cursor.XRespectingGumZoomAndBounds(), cursor.YRespectingGumZoomAndBounds()))
         {
             SetMode(Mode.Leaving);
+        }
+    }
+
+    /// <summary>
+    /// Enters the terminal's command and prints what it outputs below it.
+    /// </summary>
+    private void SubmitCommand()
+    {
+        foreach (string line in _shell.Execute(_terminal.Submit()))
+        {
+            _terminal.WriteLine(line);
+        }
+    }
+
+    /// <summary>
+    /// A clipboard chip was dropped outside the clipboard. On the screen, in
+    /// terminal mode, its word goes into the terminal's input; anywhere else
+    /// it's ignored (the chip has gone back to its slot already).
+    /// </summary>
+    private void OnWordDropped(Word word, Vector2 screenPoint)
+    {
+        Vector2 worldPoint = Vector2.Transform(screenPoint, Matrix.Invert(_camera));
+        if (_mode == Mode.Terminal && ScreenBounds.Contains(worldPoint))
+        {
+            _terminal.AddWord(word);
         }
     }
 

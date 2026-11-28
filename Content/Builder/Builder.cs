@@ -53,6 +53,9 @@ public class Builder : ContentBuilder
         // Exclude assets that match the pattern., only required overriding a default import behaviour.
         contentCollection.Exclude<WildcardRule>("Font/*.txt");
 
+        // Font files are read by the .spritefont that names them, not built on their own.
+        contentCollection.Exclude<WildcardRule>("*.ttf");
+
         // Include a specific asset with processor parameters.
         /*
         contentCollection.Include("Models/character.glb", new FbxImporter(),

@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using System.Text.Json;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Content;
@@ -21,7 +22,9 @@ namespace theTerminal.GameObjects;
 /// packed with TexturePacker) has one layer per object: walls, table, both
 /// monitors, keyboard, mouse and chair. Its neoroom.json is that script's
 /// scene.json, copied as is: the layer order, frame delay, and where the main
-/// monitor and its screen are. The prototype art is a single layer.
+/// monitor and its screen are - the screen's corners in every frame, so the
+/// terminal can be drawn on it through the whole turn. The prototype art is a
+/// single layer.
 /// </remarks>
 public class Cubicle
 {
@@ -48,6 +51,11 @@ public class Cubicle
     private static float FrameWidth => UseNeoRoom ? NeoRoomFrameWidth : PrototypeFrameWidth;
     private static float FrameHeight => UseNeoRoom ? NeoRoomFrameHeight : PrototypeFrameHeight;
 
+    // The layer holding the main monitor. The terminal is drawn on its screen
+    // between this layer and the ones after it (keyboard, mouse, chair), which
+    // can cover the screen in the angled frames.
+    private const string ScreenLayerName = "monitor-main";
+
     // Each layer's frames, back to front. A null frame has nothing to draw
     // (the second monitor is out of view by the last one).
     private readonly List<PackedSprite[]> _layers = new();
@@ -57,6 +65,13 @@ public class Cubicle
     private readonly Rectangle _angledMonitorRegion;
     private readonly Rectangle _frontMonitorRegion;
     private readonly Rectangle? _frontScreenRegion;
+
+    // The screen's corners in each frame (top left, top right, bottom right,
+    // bottom left), in frame pixels; null for the prototype art.
+    private readonly Vector2[][] _screenCorners;
+
+    // The last layer drawn behind the terminal (see ScreenLayerName).
+    private readonly int _screenLayer;
 
     // The frame on screen, and the one the current turn is heading to.
     private int _frame;
@@ -76,6 +91,29 @@ public class Cubicle
 
     /// <summary>Whether the first (angled) frame is the one on screen.</summary>
     public bool IsOnFirstFrame => _frame == 0;
+
+    /// <summary>
+    /// The monitor's screen in the frame on screen, as its four corners in
+    /// world space (top left, top right, bottom right, bottom left) - a
+    /// perspective shape in the angled frames. Null for the prototype art.
+    /// </summary>
+    public Vector2[] ScreenCorners
+    {
+        get
+        {
+            if (_screenCorners == null)
+            {
+                return null;
+            }
+
+            var corners = new Vector2[4];
+            for (int i = 0; i < 4; i++)
+            {
+                corners[i] = Position + _screenCorners[_frame][i] * Scale;
+            }
+            return corners;
+        }
+    }
 
     /// <summary>Whether a turn has been started and hasn't reached its last frame yet.</summary>
     public bool IsTurning => _frame != _targetFrame;
@@ -150,6 +188,12 @@ public class Cubicle
             _angledMonitorRegion = ReadRectangle(regions.GetProperty("monitor-first"));
             _frontMonitorRegion = ReadRectangle(regions.GetProperty("monitor-last"));
             _frontScreenRegion = ReadRectangle(regions.GetProperty("screen-last"));
+
+            _screenCorners = [.. root.GetProperty("screen").EnumerateArray().Select(frameCorners =>
+                frameCorners.EnumerateArray()
+                    .Select(point => new Vector2(point[0].GetSingle(), point[1].GetSingle()))
+                    .ToArray())];
+            _screenLayer = _layerNames.IndexOf(ScreenLayerName);
         }
         else
         {
@@ -163,6 +207,7 @@ public class Cubicle
 
             _angledMonitorRegion = PrototypeAngledMonitorRegion;
             _frontMonitorRegion = PrototypeFrontMonitorRegion;
+            _screenLayer = 0;
         }
 
         Scale = size / new Vector2(FrameWidth, FrameHeight);
@@ -203,11 +248,17 @@ public class Cubicle
         }
     }
 
-    public void Draw(SpriteBatch spriteBatch)
+    /// <summary>Draws the layers up to and including the main monitor's.</summary>
+    public void DrawBehindScreen(SpriteBatch spriteBatch) => DrawLayers(spriteBatch, 0, _screenLayer + 1);
+
+    /// <summary>Draws the layers in front of the main monitor (keyboard, mouse, chair).</summary>
+    public void DrawInFrontOfScreen(SpriteBatch spriteBatch) => DrawLayers(spriteBatch, _screenLayer + 1, _layers.Count);
+
+    private void DrawLayers(SpriteBatch spriteBatch, int from, int to)
     {
-        foreach (PackedSprite[] layer in _layers)
+        for (int i = from; i < to; i++)
         {
-            layer[_frame]?.Draw(spriteBatch, Position, Scale, Color.White);
+            _layers[i][_frame]?.Draw(spriteBatch, Position, Scale, Color.White);
         }
     }
 

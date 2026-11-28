@@ -15,8 +15,12 @@ namespace theTerminal.GameObjects;
 /// stay loosely aligned, but each chip owns its own slot independently - they
 /// don't have to be packed together, and moving one never shifts any other.
 /// Dropping a chip onto another's slot swaps the two; the chip being replaced
-/// doesn't move until the drop actually happens. There is no drop target
-/// outside the frame yet, so a chip always lands in some slot.
+/// doesn't move until the drop actually happens. A chip dropped outside the
+/// frame is offered to <see cref="WordDroppedOutside"/> (the terminal takes it
+/// when it's dropped on the screen) and goes back to its own slot either way:
+/// the word is copied, not used up, so it can be put in again. The right end
+/// of the frame is kept free of chips (<see cref="ButtonArea"/>) for the
+/// terminal's buttons.
 /// </summary>
 /// <remarks>
 /// Dragging is driven entirely by <see cref="Update"/> polling the raw cursor
@@ -36,6 +40,10 @@ public class Clipboard : IDisposable
     private const float ChipWidth = 130f;
     private const float ChipHeight = 20f;
 
+    // Width kept free at the right end of the frame for the terminal's buttons
+    // (see ButtonArea). Leaves room for 10 columns of chips at 1440 wide.
+    private const float ButtonAreaWidth = 84f;
+
     private sealed class ChipEntry
     {
         public ContainerRuntime Chip;
@@ -53,10 +61,17 @@ public class Clipboard : IDisposable
     private float _dragOffsetX;
     private float _dragOffsetY;
 
+    /// <summary>
+    /// Called when a chip is dropped outside the frame, with its word and
+    /// where the cursor let go, in screen space.
+    /// </summary>
+    public Action<Word, Vector2> WordDroppedOutside;
+
     public Clipboard()
     {
         _frame = CreateFrame();
-        _columns = (int)((_frame.Width - Padding * 2 + Gap) / (ChipWidth + Gap));
+        // The chips get the frame's inside minus the button area and the gap before it.
+        _columns = (int)((_frame.Width - Padding * 2 - ButtonAreaWidth) / (ChipWidth + Gap));
         _totalSlots = _columns * Rows;
     }
 
@@ -76,6 +91,16 @@ public class Clipboard : IDisposable
         }
         return false;
     }
+
+    /// <summary>
+    /// The space at the right end of the frame, inside its padding, where no
+    /// chip goes: the terminal's buttons sit here. In screen space.
+    /// </summary>
+    public Rectangle ButtonArea => new(
+        (int)(_frame.X + _frame.Width - Padding - ButtonAreaWidth),
+        (int)(_frame.Y + Padding),
+        (int)ButtonAreaWidth,
+        (int)(_frame.Height - Padding * 2));
 
     /// <summary>The top edge of the clipboard frame, in screen space.</summary>
     public float Top => _frame.Y;
@@ -109,7 +134,7 @@ public class Clipboard : IDisposable
         }
         else
         {
-            EndDrag();
+            EndDrag(cursorX, cursorY);
         }
     }
 
@@ -151,8 +176,17 @@ public class Clipboard : IDisposable
         }
     }
 
-    private void EndDrag()
+    private void EndDrag(float cursorX, float cursorY)
     {
+        if (!Contains(cursorX, cursorY))
+        {
+            ChipEntry dropped = _draggedEntry;
+            _draggedEntry = null;
+            ApplySlotPosition(dropped);
+            WordDroppedOutside?.Invoke(dropped.Word, new Vector2(cursorX, cursorY));
+            return;
+        }
+
         int targetSlot = GetNearestSlotIndex(_draggedEntry.Chip.X, _draggedEntry.Chip.Y);
         var occupant = FindBySlot(targetSlot, excluding: _draggedEntry);
 
