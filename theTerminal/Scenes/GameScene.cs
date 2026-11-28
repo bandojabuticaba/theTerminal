@@ -101,7 +101,7 @@ public class GameScene : Scene
     // with the zoom), where point sampling gives uneven, shimmering pixels.
     private static readonly SamplerState ArtSampler = SamplerState.LinearClamp;
 
-    // Neo's room fills the canvas at an even 3x, so point sampling keeps every
+    // Neo's room fills the canvas at an even 2x, so point sampling keeps every
     // rendered pixel a crisp block. The prototype art needs linear (above).
     private static readonly SamplerState SceneSampler = Cubicle.UseNeoRoom ? SamplerState.PointClamp : ArtSampler;
 

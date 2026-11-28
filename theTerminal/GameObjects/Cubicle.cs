@@ -38,12 +38,12 @@ public class Cubicle
     private static readonly Rectangle PrototypeFrontMonitorRegion = new(121, 170, 109, 86);
 
     // Native size of each frame (see prototype-scene-definition.xml). Neo's
-    // room frames are a third of the 1440x810 canvas, so they fill it at an
-    // even 3x; keep these in sync with WIDTH/HEIGHT in neo_room.py.
+    // room frames are half of the 1440x810 canvas, so they fill it at an
+    // even 2x; keep these in sync with WIDTH/HEIGHT in neo_room.py.
     private const float PrototypeFrameWidth = 358f;
     private const float PrototypeFrameHeight = 541f;
-    private const float NeoRoomFrameWidth = 480f;
-    private const float NeoRoomFrameHeight = 270f;
+    private const float NeoRoomFrameWidth = 720f;
+    private const float NeoRoomFrameHeight = 405f;
 
     private static float FrameWidth => UseNeoRoom ? NeoRoomFrameWidth : PrototypeFrameWidth;
     private static float FrameHeight => UseNeoRoom ? NeoRoomFrameHeight : PrototypeFrameHeight;
