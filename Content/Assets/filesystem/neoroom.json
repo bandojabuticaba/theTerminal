@@ -1,0 +1,16 @@
+// The files on the computer in Neo's room: what the terminal's commands see.
+// The tree is written as it looks: an object is a directory (its keys are what's
+// inside it), a string is a file (the string is its text, for commands that read
+// files later). Names are as the player sees them.
+{
+  // The directory the shell starts in, as a path from the root ("/").
+  // Set it to "/secrets" to try the list command in an empty directory.
+  "start": "/",
+
+  "root": {
+    "follow_the_white_rabbit.txt": "Wake up, Neo...",
+    "notes.txt": "Meet Morpheus. Bring nothing.",
+    "trace.sh": "",
+    "secrets": {}
+  }
+}
